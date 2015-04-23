@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/GenericDao.iml" filepath="$PROJECT_DIR$/GenericDao.iml" />
+      <module fileurl="file://$PROJECT_DIR$/genericdao/genericdao.iml" filepath="$PROJECT_DIR$/genericdao/genericdao.iml" />
+    </modules>
+  </component>
+</project>
