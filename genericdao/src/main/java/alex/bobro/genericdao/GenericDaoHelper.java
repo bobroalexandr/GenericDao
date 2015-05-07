@@ -6,15 +6,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
 import android.util.Log;
 
-import alex.bobro.genericdao.entities.Column;
-import alex.bobro.genericdao.entities.FieldType;
-import alex.bobro.genericdao.entities.RelationType;
-import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
-
-import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
@@ -26,6 +17,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+
+import alex.bobro.genericdao.entities.Column;
+import alex.bobro.genericdao.entities.FieldType;
+import alex.bobro.genericdao.entities.RelationType;
+import alex.bobro.genericdao.util.CollectionUtils;
+import alex.bobro.genericdao.util.OutValue;
 
 /**
  * Created by alex on 25.11.14.
@@ -197,12 +194,13 @@ public class GenericDaoHelper {
         return keyValue.split(SEPARATOR);
     }
 
-    public static <DbEntity> ContentValues toCv(@NotNull DbEntity dbEntity, Map<String, String> additionalCv) {
-        return toCv(true, dbEntity, additionalCv);
-    }
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> ContentValues toCv(boolean isDeep, @NotNull DbEntity dbEntity, Map<String, String> additionalCv) {
+    public static <DbEntity> ContentValues toCv(@NotNull DbEntity dbEntity, Map<String, String> additionalCv, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters) {
+        if(requestParameters == null) {
+            requestParameters = new RequestParameters.Builder().build();
+        }
+
         Class objectClass = dbEntity.getClass();
         Scheme scheme = Scheme.getSchemeInstance(objectClass);
 
@@ -227,7 +225,7 @@ public class GenericDaoHelper {
                 continue;
 
             try {
-                checkValueAndPutIntoCV(isDeep, cv, column, scheme, dbEntity);
+                operations.addAll(checkValueAndPutIntoCV(cv, column, scheme, dbEntity, requestParameters));
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -255,7 +253,12 @@ public class GenericDaoHelper {
             int objectFinishIndex = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
             if(objectFinishIndex == -1)
                 objectFinishIndex = columns.size();
-            Class objectClass = Class.forName(cursor.getString(objectIndex.value));
+
+            String className = cursor.getString(objectIndex.value);
+            if(TextUtils.isEmpty(className))
+                return null;
+
+            Class objectClass = Class.forName(className);
             objectIndex.value = objectFinishIndex;
 
             Scheme scheme = Scheme.getSchemeInstance(objectClass);
@@ -290,7 +293,7 @@ public class GenericDaoHelper {
             }
             return entity;
 
-        } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -315,9 +318,10 @@ public class GenericDaoHelper {
         return -1;
     }
 
-    private static void checkValueAndPutIntoCV(boolean isDeep, @NotNull ContentValues cv, @NotNull Column column, @NotNull Scheme scheme, Object object) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
+    private static ArrayList<GenericContentProviderOperation> checkValueAndPutIntoCV(@NotNull ContentValues cv, @NotNull Column column, @NotNull Scheme scheme, Object object, RequestParameters requestParameters) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
+        ArrayList<GenericContentProviderOperation> contentProviderOperationList = new ArrayList<>();
         if (object == null)
-            return;
+            return contentProviderOperationList;
 
         Field field = column.getConnectedField();
         if(!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
@@ -329,11 +333,11 @@ public class GenericDaoHelper {
             fieldValue = "";
 
         if (fieldValue == null)
-            return;
+            return contentProviderOperationList;
 
         FieldType fieldType = FieldType.findByTypeClass(field.getType());
         if (fieldType == null)
-            return;
+            return contentProviderOperationList;
 
         String name = (TextUtils.isEmpty(column.getName())) ? field.getName() : column.getName();
 
@@ -381,8 +385,8 @@ public class GenericDaoHelper {
             case OBJECT:
                 if(RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
                     cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldValue));
-                    if(isDeep) {
-                        GenericDao.getInstance().save(fieldValue);
+                    if(!RequestParameters.SavingMode.JUST_PARENT.equals(requestParameters.getSavingMode())) {
+                        contentProviderOperationList.addAll(GenericDao.getInstance().getContentProviderOperationBatch(fieldValue, null, null, null));
                     }
                 } else if (fieldValue instanceof List) {
                     ParameterizedType listType = (ParameterizedType) field.getGenericType();
@@ -399,6 +403,7 @@ public class GenericDaoHelper {
                 break;
         }
 
+        return contentProviderOperationList;
     }
 
 

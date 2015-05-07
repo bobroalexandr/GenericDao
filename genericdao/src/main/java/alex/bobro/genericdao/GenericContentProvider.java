@@ -1,13 +1,11 @@
 package alex.bobro.genericdao;
 
 
-import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
 import android.content.ContentValues;
 import android.database.Cursor;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 public interface GenericContentProvider {
 

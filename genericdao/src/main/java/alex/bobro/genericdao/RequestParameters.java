@@ -1,25 +1,26 @@
 package alex.bobro.genericdao;
 
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class RequestParameters {
 
-    enum NotificationMode {
+    public enum NotificationMode {
         FOR_EACH, AFTER_ALL;
     }
 
-    private boolean isDeep;
+    public enum SavingMode {
+        FULL, JUST_NESTED, JUST_PARENT;
+    }
+
+    private SavingMode savingMode;
     private NotificationMode notificationMode;
 
     private RequestParameters(Builder builder) {
-        this.isDeep = builder.isDeep;
+        this.savingMode = builder.savingMode;
         this.notificationMode = builder.notificationMode;
     }
 
-    public boolean isDeep() {
-        return isDeep;
+    public SavingMode getSavingMode() {
+        return savingMode;
     }
 
     public NotificationMode getNotificationMode() {
@@ -28,11 +29,11 @@ public class RequestParameters {
 
     public static class Builder {
 
-        private boolean isDeep;
+        private SavingMode savingMode;
         private NotificationMode notificationMode;
 
         public Builder() {
-            isDeep = true;
+            savingMode = SavingMode.FULL;
             notificationMode = NotificationMode.FOR_EACH;
         }
 
@@ -40,8 +41,8 @@ public class RequestParameters {
             return new RequestParameters(this);
         }
 
-        public Builder withIsDeep(boolean isDeep) {
-            this.isDeep = isDeep;
+        public Builder withSavingMode(SavingMode savingMode) {
+            this.savingMode = savingMode;
             return this;
         }
 

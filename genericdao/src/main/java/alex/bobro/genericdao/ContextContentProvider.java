@@ -9,12 +9,11 @@ import android.database.Cursor;
 import android.os.RemoteException;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 /**
  * Created by alex on 12/16/14.
  */
-public class ContextContentProvider extends AbstractGenericContentProvider  {
+public class ContextContentProvider extends AbstractGenericContentProvider {
 
     private Context context;
 

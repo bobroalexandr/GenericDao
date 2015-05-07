@@ -12,11 +12,11 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.net.Uri;
 import android.text.TextUtils;
 
-import alex.bobro.genericdao.util.OutValue;
-
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
 import alex.bobro.genericdao.util.OutValue;
 
@@ -124,8 +124,10 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
         int count = db.delete(table, selection, selectionArgs);
         if(count > 0) {
             notifyUri(uri);
-            for (Scheme foreignScheme : scheme.getForeignSchemes()) {
-                notifyUri(foreignScheme.getUri(getContext()));
+            if(scheme != null) {
+                for (Scheme foreignScheme : scheme.getForeignSchemes()) {
+                    notifyUri(foreignScheme.getUri(getContext()));
+                }
             }
         }
         return count;

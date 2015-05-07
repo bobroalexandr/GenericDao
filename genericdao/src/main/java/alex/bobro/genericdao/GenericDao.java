@@ -6,11 +6,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
 import android.util.Pair;
 
-import alex.bobro.genericdao.entities.Column;
-import alex.bobro.genericdao.util.CollectionUtils;
-
-import alex.bobro.genericdao.util.SingletonHelper;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -18,6 +13,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+
+import alex.bobro.genericdao.entities.Column;
+import alex.bobro.genericdao.util.CollectionUtils;
+import alex.bobro.genericdao.util.SingletonHelper;
 
 public final class GenericDao<DbHelper extends GenericContentProvider> {
 
@@ -51,7 +50,23 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return saveCollection(entities, null);
     }
 
+    public <DbEntity> void saveCollectionAsync(final Collection<DbEntity> entities) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                saveCollection(entities);
+            }
+        }).start();
+    }
 
+    public <DbEntity> void saveCollectionAsync(final Collection<DbEntity> entities, final RequestParameters requestParameters) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                saveCollection(entities, requestParameters);
+            }
+        }).start();
+    }
     /**
      * Save all entities into db and return true if success or save nothing and return false if failure.
      *
@@ -102,6 +117,15 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return save(dbEntity, null, null, null);
     }
 
+    public <DbEntity> void saveAsync(final DbEntity dbEntity) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                save(dbEntity);
+            }
+        }).start();
+    }
+
 
     protected <DbEntity> ArrayList<GenericContentProviderOperation> getContentProviderOperationBatch(DbEntity dbEntity, HashMap<String, String> additionalCV, QueryParameters insertParams, RequestParameters requestParameters) {
         if(requestParameters == null) {
@@ -117,13 +141,15 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         }
 
         try {
-            GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
-            builder.withContentValues(GenericDaoHelper.toCv(requestParameters.isDeep(), dbEntity, additionalCV))
-                    .withQueryParameters(insertParams)
-                    .withTable(scheme.getName());
-            contentProviderOperations.add(builder.build());
+            if(!RequestParameters.SavingMode.JUST_NESTED.equals(requestParameters.getSavingMode())) {
+                GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
+                builder.withContentValues(GenericDaoHelper.toCv(dbEntity, additionalCV, contentProviderOperations, requestParameters))
+                        .withQueryParameters(insertParams)
+                        .withTable(scheme.getName());
+                contentProviderOperations.add(builder.build());
+            }
 
-            if(requestParameters.isDeep()) {
+            if(!RequestParameters.SavingMode.JUST_PARENT.equals(requestParameters.getSavingMode())) {
                 contentProviderOperations.addAll(getNestedContentProviderOperationBatch(dbEntity));
             }
         } catch (Exception e) {
@@ -138,6 +164,8 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
         Class objectClass = dbEntity.getClass();
         Scheme scheme = Scheme.getSchemeInstance(objectClass);
+        RequestParameters nestedParameters = new RequestParameters.Builder().withSavingMode(RequestParameters.SavingMode.FULL).build();
+
         try {
             String keyValue = GenericDaoHelper.toKeyValue(dbEntity);
             if (TextUtils.isEmpty(keyValue))
@@ -145,7 +173,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
             for (String oneToManyField : scheme.getOneToManyFields()) {
                 Column oneToManyColumn = scheme.getAnnotatedFields().get(oneToManyField);
-                if(!scheme.getAllFields().get(objectClass).contains(oneToManyColumn.getConnectedField())) {
+                if(!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
                     continue;
                 }
                 Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, oneToManyColumn.getConnectedField());
@@ -160,20 +188,20 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
                 List list = (List) value;
                 for (Object object : list) {
-                    contentProviderOperations.addAll(GenericDao.getInstance().getContentProviderOperationBatch(object, additionalCv, null, null));
+                    contentProviderOperations.addAll(GenericDao.getInstance().getContentProviderOperationBatch(object, additionalCv, null, nestedParameters));
                 }
             }
 
             for (String manyToManyField : scheme.getManyToManyFields()) {
                 Column manyToManyColumn = scheme.getAnnotatedFields().get(manyToManyField);
-                if(!scheme.getAllFields().get(objectClass).contains(manyToManyColumn.getConnectedField())) {
+                if(!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
                     continue;
                 }
                 Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, manyToManyColumn.getConnectedField());
                 if (value != null) {
                     List list = (List) value;
                     for (Object object : list) {
-                        contentProviderOperations.addAll(GenericDao.getInstance().getContentProviderOperationBatch(object, null, null, null));
+                        contentProviderOperations.addAll(GenericDao.getInstance().getContentProviderOperationBatch(object, null, null, nestedParameters));
 
                         ContentValues manyToManyCV = new ContentValues();
                         manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
@@ -198,13 +226,22 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return contentProviderOperations;
     }
 
+    public  <DbEntity> void saveAsync(final DbEntity dbEntity, final HashMap<String, String> additionalCV, final QueryParameters insertParams, final RequestParameters requestParameters) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                save(dbEntity, additionalCV, insertParams, requestParameters);
+            }
+        }).start();
+    }
+
     /**
      * Save entity into database if not exists or update it otherwise.
      *
      * @param dbEntity entity to save into db
      * @return id of saved object if save, state UPDATED if updated, state FAILURE if fault
      */
-    protected <DbEntity> long save(DbEntity dbEntity, HashMap<String, String> additionalCV, QueryParameters insertParams, RequestParameters requestParameters) {
+    public  <DbEntity> long save(DbEntity dbEntity, HashMap<String, String> additionalCV, QueryParameters insertParams, RequestParameters requestParameters) {
         if (dbEntity == null)
             return FAILED;
 

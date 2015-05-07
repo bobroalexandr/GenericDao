@@ -6,18 +6,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.text.TextUtils;
 
-import alex.bobro.genericdao.annotation.FieldAnnotation;
-import alex.bobro.genericdao.annotation.TableAnnotation;
-import alex.bobro.genericdao.entities.Column;
-import alex.bobro.genericdao.entities.ForeignKeyActions;
-import alex.bobro.genericdao.entities.RelationType;
-import alex.bobro.genericdao.entities.SQLiteType;
-import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
-
-import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
@@ -32,6 +20,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+
+import alex.bobro.genericdao.annotation.FieldAnnotation;
+import alex.bobro.genericdao.annotation.TableAnnotation;
+import alex.bobro.genericdao.entities.Column;
+import alex.bobro.genericdao.entities.ForeignKeyActions;
+import alex.bobro.genericdao.entities.RelationType;
+import alex.bobro.genericdao.entities.SQLiteType;
+import alex.bobro.genericdao.util.CollectionUtils;
+import alex.bobro.genericdao.util.OutValue;
 
 public class Scheme {
 
