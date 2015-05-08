@@ -29,6 +29,7 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
     public static final String CONFLICT_ALGORITHM = "conflictAlgorithm";
     public static final String SHOULD_NOTIFY = "shouldNotify";
+    public static final String REQUEST_MODE = "requestMode";
     public static final String ID = "id";
 
     private UriMatcher uriMatcher;

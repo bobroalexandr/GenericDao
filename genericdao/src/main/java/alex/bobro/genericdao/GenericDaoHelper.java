@@ -1,5 +1,6 @@
 package alex.bobro.genericdao;
 
+import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -15,6 +16,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,57 +25,48 @@ import alex.bobro.genericdao.entities.FieldType;
 import alex.bobro.genericdao.entities.RelationType;
 import alex.bobro.genericdao.util.CollectionUtils;
 import alex.bobro.genericdao.util.OutValue;
+import alex.bobro.genericdao.util.Reflection;
 
-/**
- * Created by alex on 25.11.14.
- */
+@SuppressWarnings({"unused"})
 public class GenericDaoHelper {
 
-    public static <T> Object getValueForField(@NotNull Class<T> genericDaoClass, @NotNull Object object, @NotNull Field field) throws InvocationTargetException, IllegalAccessException {
+    public static Scheme getSchemeInstanceOrThrow(Class clazz) {
+        Scheme scheme = Scheme.getSchemeInstance(clazz);
+        if (scheme == null) throw new Error("Scheme hasn't been initialized yet!");
+
+        return scheme;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Object getValueForField(@NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field) {
         Object value;
-        Method getter = null;
+        Reflection.Invoker getterInvoker = Reflection.invoker(false, getGetterName(field), genericDaoClass);
 
-        try {
-            getter = genericDaoClass.getMethod(getGetterName(field));
-        } catch (NoSuchMethodException e) {
-//            e.printStackTrace();
-        }
-
-        if (getter != null && field.getType().equals(getter.getReturnType())) {
-            value = getter.invoke(object);
+        if (getterInvoker != null && field.getType().equals(getterInvoker.getMethod().getReturnType())) {
+            value = getterInvoker.invokeFor(object);
 
         } else {
-            if (!field.isAccessible())
-                field.setAccessible(true);
-
-            value = field.get(object);
+            Reflection.Accessor fieldAccessor = Reflection.accessor(field);
+            value = fieldAccessor.get(object);
         }
 
         return value;
     }
 
-    public static <T> void setValueForField(@NotNull Class<T> genericDaoClass, @NotNull Object object, @NotNull Field field, Object value) throws InvocationTargetException, IllegalAccessException {
-        if(!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
+    @SuppressWarnings("unchecked")
+    public static void setValueForField(@NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field, Object value) {
+        if (!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
             field = Scheme.getFieldByNameFrom(object.getClass(), field.getName());
         }
-        Method fieldSetter = null;
+        Reflection.Invoker setterInvoker = Reflection.invoker(false, getSetterName(field), genericDaoClass, field.getType());
 
-        try {
-            fieldSetter = genericDaoClass.getMethod(getSetterName(field), field.getType());
-        } catch (NoSuchMethodException e) {
-//            e.printStackTrace();
-        }
-
-        if (fieldSetter != null) {
-            fieldSetter.invoke(object, value);
+        if (setterInvoker != null) {
+            setterInvoker.invokeFor(object, value);
 
         } else {
-            if (!field.isAccessible())
-                field.setAccessible(true);
-
-            field.set(object, value);
+            Reflection.Accessor fieldAccessor = Reflection.accessor(field);
+            fieldAccessor.set(object, value);
         }
-
     }
 
 
@@ -163,7 +156,7 @@ public class GenericDaoHelper {
     private static final String SEPARATOR = "$$$";
 
     public static String toKeyValue(Object value) {
-        Scheme scheme = Scheme.getSchemeInstance(value.getClass());
+        Scheme scheme = getSchemeInstanceOrThrow(value.getClass());
 
         String[] keyFields = new String[]{scheme.getKeyField()};
         if (keyFields.length == 0) {
@@ -172,20 +165,13 @@ public class GenericDaoHelper {
 
         StringBuilder builder = new StringBuilder();
 
-        try {
-            for (int i = 0; i < keyFields.length; i++) {
-                String keyField = keyFields[i];
-                if (i != 0) {
-                    builder.append(SEPARATOR);
-                }
-                builder.append(getValueForField(value.getClass(), value, scheme.getAnnotatedFields().get(keyField).getConnectedField()));
-
+        for (int i = 0; i < keyFields.length; i++) {
+            String keyField = keyFields[i];
+            if (i != 0) {
+                builder.append(SEPARATOR);
             }
-        } catch (Exception e) {
-            Log.e("test!","scheme = " + scheme.getName());
-            e.printStackTrace();
+            builder.append(getValueForField(value.getClass(), value, scheme.getAnnotatedFields().get(keyField).getConnectedField()));
         }
-
 
         return builder.toString();
     }
@@ -197,12 +183,12 @@ public class GenericDaoHelper {
 
     @SuppressWarnings("unchecked")
     public static <DbEntity> ContentValues toCv(@NotNull DbEntity dbEntity, Map<String, String> additionalCv, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters) {
-        if(requestParameters == null) {
+        if (requestParameters == null) {
             requestParameters = new RequestParameters.Builder().build();
         }
 
         Class objectClass = dbEntity.getClass();
-        Scheme scheme = Scheme.getSchemeInstance(objectClass);
+        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
 
         ContentValues cv = new ContentValues();
         cv.put(Scheme.COLUMN_OBJECT_CLASS_NAME, dbEntity.getClass().getName());
@@ -214,14 +200,14 @@ public class GenericDaoHelper {
 
         for (String fieldKey : scheme.getAnnotatedFields().keySet()) {
             Column column = scheme.getAnnotatedFields().get(fieldKey);
-            if(!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.fieldNameComparator)) {
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.fieldNameComparator)) {
                 continue;
             }
             if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType())) {
                 continue;
             }
 
-            if (Arrays.asList(scheme.getKeyField()).contains(column.getName()) && scheme.isAutoincrement())
+            if (TextUtils.equals(scheme.getKeyField(), column.getName()) && scheme.isAutoincrement())
                 continue;
 
             try {
@@ -248,57 +234,56 @@ public class GenericDaoHelper {
 
         List<String> columns = Arrays.asList(cursor.getColumnNames());
 
+        String className = cursor.getString(objectIndex.value);
+        if (TextUtils.isEmpty(className))
+            return null;
+
+        Class objectClass;
         try {
-            int objectStartIndex = objectIndex.value;
-            int objectFinishIndex = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-            if(objectFinishIndex == -1)
-                objectFinishIndex = columns.size();
-
-            String className = cursor.getString(objectIndex.value);
-            if(TextUtils.isEmpty(className))
-                return null;
-
-            Class objectClass = Class.forName(className);
-            objectIndex.value = objectFinishIndex;
-
-            Scheme scheme = Scheme.getSchemeInstance(objectClass);
-            DbEntity entity = dbEntityClass.cast(objectClass.newInstance());
-
-            for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
-                Column column = scheme.getAnnotatedFields().get(columns.get(i));
-                if(column == null)
-                    continue;
-
-                if (cursor.isNull(i)) {
-                    if(RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-                        Scheme manyToOneScheme = Scheme.getSchemeInstance(column.getConnectedField().getType());
-                        for(int k = 0; k < manyToOneScheme.getManyToOneFields().size() + 1; k++) {
-                            objectIndex.value = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-                        }
-                    }
-                    continue;
-                }
-
-                if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType()))
-                    continue;
-
-                try {
-                    Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? objectIndex : new OutValue<>(i));
-                    GenericDaoHelper.setValueForField(objectClass, entity, column.getConnectedField(), valueForField);
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-            }
-            return entity;
-
-        } catch (Exception e) {
-            e.printStackTrace();
+            objectClass = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
         }
 
-        return null;
+        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
+        Reflection.Creator creator = Reflection.creator(objectClass);
+        DbEntity entity = dbEntityClass.cast(creator.newInstanceFor());
+        if (entity != null) fillEntityWithValues(entity, objectClass, cursor, scheme, objectIndex);
+
+        return entity;
     }
+
+    private static <DbEntity> void fillEntityWithValues(DbEntity entity, Class<DbEntity> objectClass, Cursor cursor, Scheme scheme, OutValue<Integer> objectIndex) {
+        List<String> columns = Arrays.asList(cursor.getColumnNames());
+        int objectStartIndex = objectIndex.value;
+        int objectFinishIndex = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
+        if (objectFinishIndex == -1)
+            objectFinishIndex = columns.size();
+
+        objectIndex.value = objectFinishIndex;
+
+        for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
+            Column column = scheme.getAnnotatedFields().get(columns.get(i));
+            if (column == null) continue;
+
+            if (cursor.isNull(i)) {
+                if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
+                    Scheme manyToOneScheme = getSchemeInstanceOrThrow(column.getConnectedField().getType());
+                    for (int k = 0; k < manyToOneScheme.getManyToOneFields().size() + 1; k++) {
+                        objectIndex.value = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
+                    }
+                }
+                continue;
+            }
+
+            if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType()))
+                continue;
+
+            Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? objectIndex : new OutValue<>(i));
+            GenericDaoHelper.setValueForField(objectClass, entity, column.getConnectedField(), valueForField);
+        }
+    }
+
 
     public static <T> int indexOf(List<T> list, int startIndex, Object object) {
         int s = list.size();
@@ -318,18 +303,19 @@ public class GenericDaoHelper {
         return -1;
     }
 
+    @SuppressWarnings({"all", "unchecked"})
     private static ArrayList<GenericContentProviderOperation> checkValueAndPutIntoCV(@NotNull ContentValues cv, @NotNull Column column, @NotNull Scheme scheme, Object object, RequestParameters requestParameters) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
         ArrayList<GenericContentProviderOperation> contentProviderOperationList = new ArrayList<>();
         if (object == null)
             return contentProviderOperationList;
 
         Field field = column.getConnectedField();
-        if(!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
+        if (!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
             field = Scheme.getFieldByNameFrom(object.getClass(), field.getName());
         }
-        Object fieldValue = GenericDaoHelper.getValueForField(object.getClass(), object, field);
 
-        if (fieldValue == null && scheme.getKeyField() != null && Arrays.asList(scheme.getKeyField()).contains(field.getName()))
+        Object fieldValue = GenericDaoHelper.getValueForField(object.getClass(), object, field);
+        if (fieldValue == null && scheme.getKeyField() != null && TextUtils.equals(scheme.getKeyField(), field.getName()))
             fieldValue = "";
 
         if (fieldValue == null)
@@ -383,27 +369,30 @@ public class GenericDaoHelper {
                 break;
 
             case OBJECT:
-                if(RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-                    cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldValue));
-                    if(!RequestParameters.SavingMode.JUST_PARENT.equals(requestParameters.getSavingMode())) {
-                        contentProviderOperationList.addAll(GenericDao.getInstance().getContentProviderOperationBatch(fieldValue, null, null, null));
-                    }
-                } else if (fieldValue instanceof List) {
-                    ParameterizedType listType = (ParameterizedType) field.getGenericType();
-                    FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
-
-                    switch (type) {
-                        case STRING:
-                            List<String> list = (List<String>) fieldValue;
-                            cv.put(name, GenericDaoHelper.collectionToString(list));
-                            break;
-                    }
-
-                }
+                putObjectIntoCv(column, cv, fieldValue, requestParameters, field, name, contentProviderOperationList);
                 break;
         }
 
         return contentProviderOperationList;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void putObjectIntoCv(Column column, ContentValues cv, Object fieldValue, RequestParameters requestParameters, Field field, String name,
+                                        List<GenericContentProviderOperation> contentProviderOperationList) {
+        if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
+            cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldValue));
+        } else if (fieldValue instanceof List) {
+            ParameterizedType listType = (ParameterizedType) field.getGenericType();
+            FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
+
+            switch (type) {
+                case STRING:
+                    List<String> list = (List<String>) fieldValue;
+                    cv.put(name, GenericDaoHelper.collectionToString(list));
+                    break;
+            }
+
+        }
     }
 
 
@@ -455,23 +444,150 @@ public class GenericDaoHelper {
                 break;
 
             case OBJECT:
-                if (List.class.isAssignableFrom(field.getType())) {
-                    ParameterizedType listType = (ParameterizedType) field.getGenericType();
-                    FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
-
-                    switch (type) {
-                        case STRING:
-                            valueForField = Arrays.asList(cursor.getString(index).split(","));
-                            break;
-                    }
-
-                } else {
-                    valueForField = GenericDaoHelper.fromCursor(cursor, field.getType(), objectIndex);
-                }
+                valueForField = getValueFromFieldForObject(field, cursor, index, objectIndex);
                 break;
         }
 
         return valueForField;
+    }
+
+    private static Object getValueFromFieldForObject(Field field, Cursor cursor, int index, OutValue<Integer> objectIndex) {
+        if (List.class.isAssignableFrom(field.getType())) {
+            ParameterizedType listType = (ParameterizedType) field.getGenericType();
+            FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
+
+            switch (type) {
+                case STRING:
+                    return Arrays.asList(cursor.getString(index).split(","));
+            }
+
+        } else {
+            return GenericDaoHelper.fromCursor(cursor, field.getType(), objectIndex);
+        }
+
+        return null;
+    }
+
+    static <DbEntity> ArrayList<GenericContentProviderOperation> getContentProviderOperationBatch(DbEntity dbEntity, HashMap<String, String> additionalCV, QueryParameters insertParams, RequestParameters requestParameters) {
+        if (requestParameters == null) {
+            requestParameters = new RequestParameters.Builder().build();
+        }
+        ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
+
+        Class objectClass = dbEntity.getClass();
+        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
+        Object keyValue = GenericDaoHelper.toKeyValue(dbEntity);
+        if (keyValue == null) {
+            return null;
+        }
+
+        if (!RequestParameters.RequestMode.JUST_NESTED.equals(requestParameters.getRequestMode())) {
+            GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
+            builder.withContentValues(GenericDaoHelper.toCv(dbEntity, additionalCV, contentProviderOperations, requestParameters))
+                    .withQueryParameters(insertParams)
+                    .withTable(scheme.getName());
+            contentProviderOperations.add(builder.build());
+        }
+
+        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
+            contentProviderOperations.addAll(getNestedContentProviderOperationBatch(dbEntity));
+        }
+
+        return contentProviderOperations;
+    }
+
+    static <DbEntity> void fillBatchWithOneToManyFields(DbEntity dbEntity, Scheme scheme, Class<DbEntity> objectClass, String keyValue, RequestParameters nestedParameters,
+                                                        List<GenericContentProviderOperation> contentProviderOperations) {
+        for (String oneToManyField : scheme.getOneToManyFields()) {
+            Column oneToManyColumn = scheme.getAnnotatedFields().get(oneToManyField);
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
+            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, oneToManyColumn.getConnectedField());
+
+            if (value == null)
+                continue;
+
+            HashMap<String, String> additionalCv = null;
+            if (!scheme.getAnnotatedFields().containsKey(GenericDaoHelper.getColumnNameFromTable(scheme.getName()))) {
+                additionalCv = new HashMap<>();
+                additionalCv.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
+            }
+
+            List list = (List) value;
+            for (Object object : list) {
+                //noinspection unchecked
+                contentProviderOperations.addAll(getContentProviderOperationBatch(object, additionalCv, null, nestedParameters));
+            }
+        }
+    }
+
+    static <DbEntity> void fillBatchWithManyToOneFields(DbEntity dbEntity, Scheme scheme, Class<DbEntity> objectClass, String keyValue, RequestParameters nestedParameters,
+                                                        List<GenericContentProviderOperation> contentProviderOperations) {
+        for (String manyToOneField : scheme.getManyToOneFields()) {
+            Column oneToManyColumn = scheme.getAnnotatedFields().get(manyToOneField);
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
+            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, oneToManyColumn.getConnectedField());
+
+            if (value == null)
+                continue;
+
+            contentProviderOperations.addAll(getContentProviderOperationBatch(value, null, null, null));
+        }
+    }
+
+    static <DbEntity> void fillBatchWithManyToManyFields(DbEntity dbEntity, Scheme scheme, Class<DbEntity> objectClass, String keyValue, RequestParameters nestedParameters,
+                                                         List<GenericContentProviderOperation> contentProviderOperations) {
+        for (String manyToManyField : scheme.getManyToManyFields()) {
+            Column manyToManyColumn = scheme.getAnnotatedFields().get(manyToManyField);
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
+            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, manyToManyColumn.getConnectedField());
+
+            if (value == null)
+                continue;
+
+            List list = (List) value;
+            for (Object object : list) {
+                //noinspection unchecked
+                contentProviderOperations.addAll(getContentProviderOperationBatch(object, null, null, nestedParameters));
+
+                ContentValues manyToManyCV = new ContentValues();
+                manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
+                manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(Scheme.getToManyClassName(manyToManyColumn)), GenericDaoHelper.toKeyValue(object));
+
+                QueryParameters.Builder queryBuilder = new QueryParameters.Builder();
+                queryBuilder.addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_IGNORE));
+
+                GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
+                builder.withContentValues(manyToManyCV)
+                        .withQueryParameters(queryBuilder.build())
+                        .withTable(scheme.getManyToManyTableName(manyToManyColumn));
+                contentProviderOperations.add(builder.build());
+            }
+        }
+    }
+
+    static <DbEntity> List<GenericContentProviderOperation> getNestedContentProviderOperationBatch(DbEntity dbEntity) {
+        List<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
+        if (dbEntity == null) return contentProviderOperations;
+
+        Class objectClass = dbEntity.getClass();
+        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
+        RequestParameters nestedParameters = new RequestParameters.Builder().withRequestMode(RequestParameters.RequestMode.FULL).build();
+
+        String keyValue = GenericDaoHelper.toKeyValue(dbEntity);
+        if (TextUtils.isEmpty(keyValue))
+            return contentProviderOperations;
+
+        fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+        fillBatchWithOneToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+        fillBatchWithManyToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+
+        return contentProviderOperations;
     }
 
     public static String getColumnNameFromTable(String table) {

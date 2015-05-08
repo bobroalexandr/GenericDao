@@ -29,8 +29,7 @@ public abstract class Reflection {
 		public T newInstanceFor(Object... args) {
 			try {
 				return c.newInstance(args);
-			} catch (InstantiationException | IllegalAccessException
-					| InvocationTargetException e) {
+			} catch (Exception e) {
 				throw new Error(e);
 			}
 		}
@@ -77,7 +76,7 @@ public abstract class Reflection {
 		}
 	}
 
-	public static <T> Accessor<T> accessor(@NotNull String fieldName, @NotNull Class<T> clazz, @Nullable Class<?> type) {
+	public static <T> Accessor<T> accessor(boolean isCritical, @NotNull String fieldName, @NotNull Class<T> clazz, @Nullable Class<?> type) {
 		if (type == null) {
 			type = Object.class;
 		}
@@ -93,8 +92,16 @@ public abstract class Reflection {
 			}
 			return new Accessor<>(field);
 		} catch (NoSuchFieldException e) {
-			throw new Error(e);
+			if(isCritical) {
+				throw new Error(e);
+			} else {
+				return null;
+			}
 		}
+	}
+
+	public static <T> Accessor<T> accessor(Field field) {
+		return new Accessor<>(field);
 	}
 
 
@@ -117,17 +124,29 @@ public abstract class Reflection {
 		public <R> R invokeFor(T receiver, Object... args) {
 			try {
 				return (R) m.invoke(receiver, args);
-			} catch (IllegalAccessException | InvocationTargetException e) {
+			} catch (Exception e) {
 				throw new Error(e);
 			}
 		}
 	}
 
-	public static <T> Invoker<T> invoker(@NotNull String methodName, @NotNull Class<T> clazz, Class<?>... args) {
+	public static <T> Invoker<T> invoker(boolean isCritical, @NotNull String methodName, @NotNull Class<T> clazz, Class<?>... args) {
 		try {
 			return new Invoker<>(clazz.getDeclaredMethod(methodName, args));
 		} catch (NoSuchMethodException e) {
-			throw new Error(e);
+			if(isCritical) {
+				throw new Error(e);
+			} else {
+				return null;
+			}
+		}
+	}
+
+	public static @Nullable Method getMethod(Class<?> clazz, String methodName) {
+		try {
+			return clazz.getMethod(methodName);
+		} catch (NoSuchMethodException e) {
+			return null;
 		}
 	}
 }

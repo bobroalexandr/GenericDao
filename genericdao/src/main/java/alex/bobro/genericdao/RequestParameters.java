@@ -7,20 +7,20 @@ public class RequestParameters {
         FOR_EACH, AFTER_ALL;
     }
 
-    public enum SavingMode {
-        FULL, JUST_NESTED, JUST_PARENT;
+    public enum RequestMode {
+        FULL, JUST_NESTED, JUST_PARENT, PARENT_WITH_MANY_TO_ONE
     }
 
-    private SavingMode savingMode;
+    private RequestMode requestMode;
     private NotificationMode notificationMode;
 
     private RequestParameters(Builder builder) {
-        this.savingMode = builder.savingMode;
+        this.requestMode = builder.requestMode;
         this.notificationMode = builder.notificationMode;
     }
 
-    public SavingMode getSavingMode() {
-        return savingMode;
+    public RequestMode getRequestMode() {
+        return requestMode;
     }
 
     public NotificationMode getNotificationMode() {
@@ -29,11 +29,11 @@ public class RequestParameters {
 
     public static class Builder {
 
-        private SavingMode savingMode;
+        private RequestMode requestMode;
         private NotificationMode notificationMode;
 
         public Builder() {
-            savingMode = SavingMode.FULL;
+            requestMode = RequestMode.FULL;
             notificationMode = NotificationMode.FOR_EACH;
         }
 
@@ -41,8 +41,8 @@ public class RequestParameters {
             return new RequestParameters(this);
         }
 
-        public Builder withSavingMode(SavingMode savingMode) {
-            this.savingMode = savingMode;
+        public Builder withRequestMode(RequestMode requestMode) {
+            this.requestMode = requestMode;
             return this;
         }
 
