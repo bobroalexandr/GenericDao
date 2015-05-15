@@ -8,15 +8,17 @@ public class RequestParameters {
     }
 
     public enum RequestMode {
-        FULL, JUST_NESTED, JUST_PARENT, PARENT_WITH_MANY_TO_ONE
+        FULL, JUST_NESTED, JUST_PARENT
     }
 
     private RequestMode requestMode;
     private NotificationMode notificationMode;
+    private boolean isManyToOneNestedAffected;
 
     private RequestParameters(Builder builder) {
         this.requestMode = builder.requestMode;
         this.notificationMode = builder.notificationMode;
+        this.isManyToOneNestedAffected = builder.isManyToOneNestedAffected;
     }
 
     public RequestMode getRequestMode() {
@@ -27,14 +29,20 @@ public class RequestParameters {
         return notificationMode;
     }
 
+    public boolean isManyToOneNestedAffected() {
+        return isManyToOneNestedAffected;
+    }
+
     public static class Builder {
 
         private RequestMode requestMode;
         private NotificationMode notificationMode;
+        private boolean isManyToOneNestedAffected;
 
         public Builder() {
             requestMode = RequestMode.FULL;
             notificationMode = NotificationMode.FOR_EACH;
+            isManyToOneNestedAffected = true;
         }
 
         public RequestParameters build() {
@@ -48,6 +56,11 @@ public class RequestParameters {
 
         public Builder withNotificationMode(NotificationMode notificationMode) {
             this.notificationMode = notificationMode;
+            return this;
+        }
+
+        public Builder withIsManyToOneNestedAffected(boolean isManyToOneNestedAffected) {
+            this.isManyToOneNestedAffected = isManyToOneNestedAffected;
             return this;
         }
     }

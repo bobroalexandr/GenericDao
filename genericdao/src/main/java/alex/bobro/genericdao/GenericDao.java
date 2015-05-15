@@ -2,6 +2,7 @@ package alex.bobro.genericdao;
 
 import android.database.Cursor;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Pair;
 
 import org.jetbrains.annotations.NotNull;
@@ -361,13 +362,17 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     }
 
     public <DbEntity> List<DbEntity> getObjects(RequestParameters requestParameters, Class<DbEntity> entityClass, String where, String[] args, String groupBy, String having, String orderBy, String limit) {
-
+        if(requestParameters == null) {
+            requestParameters = new RequestParameters.Builder().build();
+        }
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(entityClass);
         ArrayList<DbEntity> objects = new ArrayList<>();
 
         final String tableName = scheme.getName();
         if (tableName != null) {
-            Cursor cursor = dbHelper.query(scheme.getName(), null, where, args, groupBy, having, orderBy, limit);
+            QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
+            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneNestedAffected()));
+            Cursor cursor = dbHelper.query(scheme.getName(), null, where, args, groupBy, having, orderBy, limit, queryParametersBuilder.build());
 
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
@@ -403,9 +408,10 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         DbEntity entity = null;
 
         if (!TextUtils.isEmpty(scheme.getKeyField())) {
-
+            QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
+            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneNestedAffected()));
             String where = GenericDaoHelper.arrayToWhereString(scheme.getKeyFieldFullName());
-            Cursor cursor = dbHelper.query(scheme.getName(), null, where, keyValues, null, null, null, null);
+            Cursor cursor = dbHelper.query(scheme.getName(), null, where, keyValues, null, null, null, null,queryParametersBuilder.build());
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
                     entity = GenericDaoHelper.fromCursor(cursor, entityClass);

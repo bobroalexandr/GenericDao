@@ -5,6 +5,7 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -357,9 +358,14 @@ public class Scheme {
         StringBuilder stringBuilder = new StringBuilder(initial);
         for (String fieldName : getManyToOneFields()) {
             Column manyToOneColumn = getAnnotatedFields().get(fieldName);
+            if (parentColumn != null && !CollectionUtils.contains(getAllFields().get(parentColumn.getConnectedField().getType()), manyToOneColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
 
             Scheme manyToOneColumnScheme = Scheme.getSchemeInstance(manyToOneColumn.getConnectedField().getType());
-            stringBuilder.append(manyToOneColumnScheme.createJoinClause(newName,manyToOneColumn,initNumber));
+            if(this.equals(manyToOneColumnScheme) && initNumber.value > 0) continue;
+
+            stringBuilder.append(manyToOneColumnScheme.createJoinClause(newName, manyToOneColumn, initNumber));
         }
 
         return stringBuilder.toString();

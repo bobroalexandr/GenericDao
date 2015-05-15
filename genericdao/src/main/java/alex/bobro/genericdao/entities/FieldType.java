@@ -1,6 +1,8 @@
 package alex.bobro.genericdao.entities;
 
 
+import java.util.Date;
+
 public enum FieldType {
     INTEGER(SQLiteType.INTEGER, Integer.class, int.class),
     STRING(SQLiteType.TEXT, String.class),
@@ -12,6 +14,7 @@ public enum FieldType {
     DOUBLE(SQLiteType.REAL, Double.class, double.class),
     BLOB(SQLiteType.BLOB, Byte[].class, byte[].class),
     STRING_ARRAY(SQLiteType.TEXT, String[].class),
+    DATE(SQLiteType.INTEGER, Date.class),
     OBJECT(SQLiteType.TEXT);
 
     private final Class[] cls;
@@ -28,15 +31,6 @@ public enum FieldType {
 
     public SQLiteType getSqliteType() {
         return sqliteType;
-    }
-
-    public static FieldType findBySQLiteType(SQLiteType type) {
-        for (FieldType fieldType : FieldType.values()) {
-            if (fieldType.getSqliteType().equals(type)) {
-                return fieldType;
-            }
-        }
-        return null;
     }
 
     public static FieldType findByTypeClass(Class cls) {

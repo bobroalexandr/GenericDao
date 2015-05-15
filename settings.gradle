@@ -1,1 +1,1 @@
-include ':genericdao'
+include ':genericdao', ':app'

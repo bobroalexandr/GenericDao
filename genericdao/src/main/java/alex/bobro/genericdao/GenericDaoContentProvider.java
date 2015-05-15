@@ -11,6 +11,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,7 +30,7 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
     public static final String CONFLICT_ALGORITHM = "conflictAlgorithm";
     public static final String SHOULD_NOTIFY = "shouldNotify";
-    public static final String REQUEST_MODE = "requestMode";
+    public static final String IS_MANY_TO_ONE_NESTED_AFFECTED = "isManyToOneNestedAffected";
     public static final String ID = "id";
 
     private UriMatcher uriMatcher;
@@ -56,10 +57,11 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
         String table = UriHelper.getTable(uri);
         Scheme scheme = Scheme.getSchemeInstance(table);
-        String joinTable = scheme == null ? table : scheme.createJoinClause(null, null, new OutValue<>(0));
+
+        boolean isManyToOneNestedAffected = Boolean.valueOf(UriHelper.getQueryValueFromUri(uri, IS_MANY_TO_ONE_NESTED_AFFECTED, Boolean.TRUE.toString()));
+        String joinTable = (scheme == null || !isManyToOneNestedAffected) ? table : scheme.createJoinClause(null, null, new OutValue<>(0));
 
         Cursor cursor = db.query(joinTable, projection, selection, selectionArgs, null, null, sortOrder);
-
         if (cursor != null && getContext() != null) {
             cursor.setNotificationUri(getContext().getContentResolver(), uri);
         }

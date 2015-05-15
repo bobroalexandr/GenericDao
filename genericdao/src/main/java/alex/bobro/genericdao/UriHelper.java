@@ -3,6 +3,7 @@ package alex.bobro.genericdao;
 import android.content.ContentProvider;
 import android.content.Context;
 import android.net.Uri;
+import android.text.TextUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,10 @@ public class UriHelper {
     }
 
 
+    public static String getQueryValueFromUri(Uri uri, String key, String defValue) {
+        String value = uri.getQueryParameter(key);
+        return value == null ? defValue : value;
+    }
 
     public static Builder generateBuilder(Context context, String table, QueryParameters parameters) {
         Builder builder = new Builder(context);

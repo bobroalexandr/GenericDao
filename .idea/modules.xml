@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/GenericDao.iml" filepath="$PROJECT_DIR$/GenericDao.iml" />
+      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$USER_HOME$/androidutilities/AndroidUtilities/app/app.iml" filepath="$USER_HOME$/androidutilities/AndroidUtilities/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/genericdao/genericdao.iml" filepath="$PROJECT_DIR$/genericdao/genericdao.iml" />
     </modules>
   </component>

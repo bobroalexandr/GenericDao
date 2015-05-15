@@ -16,6 +16,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -265,6 +266,9 @@ public class GenericDaoHelper {
         for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
             Column column = scheme.getAnnotatedFields().get(columns.get(i));
             if (column == null) continue;
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
 
             if (cursor.isNull(i)) {
                 if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
@@ -368,6 +372,10 @@ public class GenericDaoHelper {
                 cv.put(name, GenericDaoHelper.arrayToString((String[]) fieldValue));
                 break;
 
+            case DATE:
+                cv.put(name, ((Date)fieldValue).getTime());
+                break;
+
             case OBJECT:
                 putObjectIntoCv(column, cv, fieldValue, requestParameters, field, name, contentProviderOperationList);
                 break;
@@ -443,6 +451,10 @@ public class GenericDaoHelper {
                 valueForField = cursor.getString(index).split(",");
                 break;
 
+            case DATE:
+                valueForField = new Date(cursor.getLong(index));
+                break;
+
             case OBJECT:
                 valueForField = getValueFromFieldForObject(field, cursor, index, objectIndex);
                 break;
@@ -490,7 +502,7 @@ public class GenericDaoHelper {
         }
 
         if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
-            contentProviderOperations.addAll(getNestedContentProviderOperationBatch(dbEntity));
+            contentProviderOperations.addAll(getNestedContentProviderOperationBatch(dbEntity, requestParameters));
         }
 
         return contentProviderOperations;
@@ -571,7 +583,7 @@ public class GenericDaoHelper {
         }
     }
 
-    static <DbEntity> List<GenericContentProviderOperation> getNestedContentProviderOperationBatch(DbEntity dbEntity) {
+    static <DbEntity> List<GenericContentProviderOperation> getNestedContentProviderOperationBatch(DbEntity dbEntity, RequestParameters requestParameters) {
         List<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
         if (dbEntity == null) return contentProviderOperations;
 
@@ -583,7 +595,7 @@ public class GenericDaoHelper {
         if (TextUtils.isEmpty(keyValue))
             return contentProviderOperations;
 
-        fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+        if(requestParameters.isManyToOneNestedAffected()) fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithOneToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithManyToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
 
