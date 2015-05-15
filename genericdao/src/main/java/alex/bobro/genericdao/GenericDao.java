@@ -443,9 +443,23 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
         String columnName = GenericDaoHelper.getColumnNameFromTable(scheme.getName());
 
-
+        if(requestParameters.isManyToOneNestedAffected()) fillEntityWithManyToOneFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
         fillEntityWithManyToManyFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
         fillEntityWithOneToManyFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
+    }
+
+    private <DbEntity> void fillEntityWithManyToOneFields(Scheme scheme, DbEntity entity, Class objectClass, String columnName, String keyValue, RequestParameters requestParameters) {
+        for (String manyToOneField : scheme.getManyToOneFields()) {
+            Column manyToOneColumn = scheme.getAnnotatedFields().get(manyToOneField);
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToOneColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+                continue;
+            }
+            Scheme manyToOneScheme = GenericDaoHelper.getSchemeInstanceOrThrow(manyToOneColumn.getConnectedField().getType());
+            Object object = GenericDao.getInstance().getObjectById(requestParameters, Scheme.getToManyClass(manyToOneColumn), manyToOneScheme.getName() + "." + columnName + "=?", keyValue);
+
+            //noinspection unchecked
+            GenericDaoHelper.setValueForField(objectClass, entity, manyToOneColumn.getConnectedField(), object);
+        }
     }
 
     private <DbEntity> void fillEntityWithManyToManyFields(Scheme scheme, DbEntity entity, Class objectClass, String columnName, String keyValue, RequestParameters requestParameters) {

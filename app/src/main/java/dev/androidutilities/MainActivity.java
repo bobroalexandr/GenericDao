@@ -17,6 +17,7 @@ import java.util.Calendar;
 import java.util.List;
 
 import alex.bobro.genericdao.GenericDao;
+import alex.bobro.genericdao.RequestParameters;
 import alex.bobro.genericdao.util.Reflection;
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
@@ -25,16 +26,10 @@ import dev.androidutilities.model.TestParent;
 
 public class MainActivity extends ActionBarActivity implements View.OnClickListener {
 
-    PowerManager.WakeLock wakeLock;
-    PowerManager powerManager;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getLocalClassName());
 
         findViewById(R.id.btnSave).setOnClickListener(this);
     }
@@ -54,7 +49,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         GenericDao.getInstance().save(testChild1);
         GenericDao.getInstance().save(testChild2);
 
-        List<TestChild1> child1s = GenericDao.getInstance().getObjects(TestParent.class);
+        RequestParameters.Builder builder = new RequestParameters.Builder().withIsManyToOneNestedAffected(false).withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
+        List<TestChild1> child1s = GenericDao.getInstance().getObjects(builder.build(), TestParent.class);
 
         Log.i("test!","dsa");
     }
@@ -63,9 +59,7 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btnSave:
-                wakeLock.acquire();
-                wakeLock.release();
-//                saveItems();
+                saveItems();
                 break;
         }
     }
