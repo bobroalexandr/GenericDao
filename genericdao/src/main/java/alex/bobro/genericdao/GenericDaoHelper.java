@@ -1,17 +1,14 @@
 package alex.bobro.genericdao;
 
-import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
-import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -230,7 +227,7 @@ public class GenericDaoHelper {
 
     @SuppressWarnings("unchecked")
     public static <DbEntity> DbEntity fromCursor(Cursor cursor, Class<DbEntity> dbEntityClass, OutValue<Integer> objectIndex) {
-        if (cursor == null)
+        if (cursor == null || objectIndex.value >= cursor.getColumnCount())
             return null;
 
         List<String> columns = Arrays.asList(cursor.getColumnNames());
@@ -264,6 +261,7 @@ public class GenericDaoHelper {
         objectIndex.value = objectFinishIndex;
 
         for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
+            if(i >= columns.size()) return;
             Column column = scheme.getAnnotatedFields().get(columns.get(i));
             if (column == null) continue;
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.fieldNameComparator)) {
@@ -595,7 +593,7 @@ public class GenericDaoHelper {
         if (TextUtils.isEmpty(keyValue))
             return contentProviderOperations;
 
-        if(requestParameters.isManyToOneNestedAffected()) fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+        if(requestParameters.isManyToOneGotWithParent()) fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithOneToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithManyToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
 

@@ -13,12 +13,12 @@ public class RequestParameters {
 
     private RequestMode requestMode;
     private NotificationMode notificationMode;
-    private boolean isManyToOneNestedAffected;
+    private boolean isManyToOneGotWithParent;
 
     private RequestParameters(Builder builder) {
         this.requestMode = builder.requestMode;
         this.notificationMode = builder.notificationMode;
-        this.isManyToOneNestedAffected = builder.isManyToOneNestedAffected;
+        this.isManyToOneGotWithParent = builder.isManyToOneGotWithParent;
     }
 
     public RequestMode getRequestMode() {
@@ -29,20 +29,20 @@ public class RequestParameters {
         return notificationMode;
     }
 
-    public boolean isManyToOneNestedAffected() {
-        return isManyToOneNestedAffected;
+    public boolean isManyToOneGotWithParent() {
+        return isManyToOneGotWithParent;
     }
 
     public static class Builder {
 
         private RequestMode requestMode;
         private NotificationMode notificationMode;
-        private boolean isManyToOneNestedAffected;
+        private boolean isManyToOneGotWithParent;
 
         public Builder() {
             requestMode = RequestMode.FULL;
             notificationMode = NotificationMode.FOR_EACH;
-            isManyToOneNestedAffected = true;
+            isManyToOneGotWithParent = true;
         }
 
         public RequestParameters build() {
@@ -59,8 +59,8 @@ public class RequestParameters {
             return this;
         }
 
-        public Builder withIsManyToOneNestedAffected(boolean isManyToOneNestedAffected) {
-            this.isManyToOneNestedAffected = isManyToOneNestedAffected;
+        public Builder withIsManyToOneGotWithParent(boolean isManyToOneGotWithParent) {
+            this.isManyToOneGotWithParent = isManyToOneGotWithParent;
             return this;
         }
     }

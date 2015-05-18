@@ -30,7 +30,7 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
     public static final String CONFLICT_ALGORITHM = "conflictAlgorithm";
     public static final String SHOULD_NOTIFY = "shouldNotify";
-    public static final String IS_MANY_TO_ONE_NESTED_AFFECTED = "isManyToOneNestedAffected";
+    public static final String IS_MANY_TO_ONE_NESTED_AFFECTED = "isManyToOneGotWithParent";
     public static final String ID = "id";
 
     private UriMatcher uriMatcher;

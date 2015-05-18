@@ -49,8 +49,10 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         GenericDao.getInstance().save(testChild1);
         GenericDao.getInstance().save(testChild2);
 
-        RequestParameters.Builder builder = new RequestParameters.Builder().withIsManyToOneNestedAffected(false).withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
+        RequestParameters.Builder builder = new RequestParameters.Builder()
+                .withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
         List<TestChild1> child1s = GenericDao.getInstance().getObjects(builder.build(), TestParent.class);
+        GenericDao.getInstance().fillEntityWithNestedObjects(child1s.get(0), builder.build());
 
         Log.i("test!","dsa");
     }

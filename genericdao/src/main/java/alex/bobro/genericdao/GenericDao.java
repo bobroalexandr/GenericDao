@@ -2,7 +2,6 @@ package alex.bobro.genericdao;
 
 import android.database.Cursor;
 import android.text.TextUtils;
-import android.util.Log;
 import android.util.Pair;
 
 import org.jetbrains.annotations.NotNull;
@@ -20,7 +19,6 @@ import java.util.concurrent.TimeUnit;
 
 import alex.bobro.genericdao.entities.Column;
 import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.Reflection;
 
 @SuppressWarnings("unused")
 public final class GenericDao<DbHelper extends GenericContentProvider> {
@@ -371,7 +369,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         final String tableName = scheme.getName();
         if (tableName != null) {
             QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
-            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneNestedAffected()));
+            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneGotWithParent()));
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, args, groupBy, having, orderBy, limit, queryParametersBuilder.build());
 
             if (cursor != null) {
@@ -409,7 +407,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
         if (!TextUtils.isEmpty(scheme.getKeyField())) {
             QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
-            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneNestedAffected()));
+            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneGotWithParent()));
             String where = GenericDaoHelper.arrayToWhereString(scheme.getKeyFieldFullName());
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, keyValues, null, null, null, null,queryParametersBuilder.build());
             if (cursor != null) {
@@ -443,22 +441,33 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
         String columnName = GenericDaoHelper.getColumnNameFromTable(scheme.getName());
 
-        if(requestParameters.isManyToOneNestedAffected()) fillEntityWithManyToOneFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
+        if(!requestParameters.isManyToOneGotWithParent()) fillEntityWithManyToOneFields(scheme, entity, objectClass,keyValue, requestParameters);
         fillEntityWithManyToManyFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
         fillEntityWithOneToManyFields(scheme, entity, objectClass, columnName, keyValue, requestParameters);
     }
 
-    private <DbEntity> void fillEntityWithManyToOneFields(Scheme scheme, DbEntity entity, Class objectClass, String columnName, String keyValue, RequestParameters requestParameters) {
+    private <DbEntity> void fillEntityWithManyToOneFields(Scheme scheme, DbEntity entity, Class objectClass, String keyValue, RequestParameters requestParameters) {
         for (String manyToOneField : scheme.getManyToOneFields()) {
             Column manyToOneColumn = scheme.getAnnotatedFields().get(manyToOneField);
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToOneColumn.getConnectedField(), Scheme.fieldNameComparator)) {
                 continue;
             }
-            Scheme manyToOneScheme = GenericDaoHelper.getSchemeInstanceOrThrow(manyToOneColumn.getConnectedField().getType());
-            Object object = GenericDao.getInstance().getObjectById(requestParameters, Scheme.getToManyClass(manyToOneColumn), manyToOneScheme.getName() + "." + columnName + "=?", keyValue);
 
-            //noinspection unchecked
-            GenericDaoHelper.setValueForField(objectClass, entity, manyToOneColumn.getConnectedField(), object);
+            String manyToOneColumnName = manyToOneColumn.getName();
+            QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
+            queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(false));
+            Cursor objectCursor = dbHelper.query(scheme.getName(), new String[]{manyToOneColumnName}, scheme.getKeyField() + "=?", new String[]{keyValue}, null, null, null, null, queryParametersBuilder.build());
+
+            if(objectCursor != null && objectCursor.moveToFirst()) {
+                String key = objectCursor.getString(objectCursor.getColumnIndex(manyToOneColumnName));
+                if(TextUtils.isEmpty(key)) return;
+
+                Scheme manyToOneScheme = GenericDaoHelper.getSchemeInstanceOrThrow(manyToOneColumn.getConnectedField().getType());
+                Object object = GenericDao.getInstance().getObjectById(requestParameters, manyToOneColumn.getConnectedField().getType(), key);
+
+                //noinspection unchecked
+                GenericDaoHelper.setValueForField(objectClass, entity, manyToOneColumn.getConnectedField(), object);
+            }
         }
     }
 
