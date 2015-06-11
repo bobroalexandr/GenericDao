@@ -1,10 +1,21 @@
 apply plugin: 'com.android.application'
+apply plugin: 'de.mobilej.unmock'
 
 
 allprojects {
     repositories {
         jcenter()
         maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    }
+}
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'de.mobilej.unmock:UnMockPlugin:0.1.1'
     }
 }
 
@@ -20,6 +31,7 @@ android {
         versionCode 1
         versionName "1.0"
     }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -36,9 +48,40 @@ android {
     }
 }
 
+unMock {
+    // URI to download the android-all.jar from. e.g. https://oss.sonatype.org/content/groups/public/org/robolectric/android-all/
+    allAndroid =
+            'https://oss.sonatype.org/content/groups/public/org/robolectric/android-all/4.3_r2-robolectric-0/android-all-4.3_r2-robolectric-0.jar'
+
+    // classes to keep
+    // matched by "startsWith" - you also need to include the dependencies manually
+    // if you start with an "-" the class will match by "equals" (and it will additionally  match
+    // inner classes of this class)
+    keep = [
+            "android.text.TextUtils",
+            "android.util.",
+            "android.text.",
+            "android.content.ContentValues",
+            "android.content.Intent",
+            "-android.location.Location",
+            "android.content.res.Configuration",
+            "org.",
+            "libcore.",
+            "com.android.internal.R",
+            "com.android.internal.util."
+    ]
+}
+
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.android.support:appcompat-v7:21.0.3'
     compile 'org.glassfish:javax.annotation:10.0-b28'
     compile project(':genericdao')
+
+    // Unit testing dependencies
+    testCompile 'junit:junit:4.12'
+    // Set this dependency if you want to use Mockito
+    testCompile 'org.mockito:mockito-core:1.10.19'
+    // Set this dependency if you want to use Hamcrest matching
+    androidTestCompile 'org.hamcrest:hamcrest-library:1.1'
 }

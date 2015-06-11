@@ -23,7 +23,6 @@ public class TestParent {
     }
 
     public TestParent(int _id, String name) {
-        Log.i("test!", "constructor " + getClass().getSimpleName());
         this._id = _id;
         this.name = name;
     }

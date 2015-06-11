@@ -1,5 +1,6 @@
 package alex.bobro.genericdao;
 
+import android.content.ContentValues;
 import android.database.Cursor;
 import android.text.TextUtils;
 import android.util.Pair;
@@ -143,11 +144,11 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         }).start();
     }
 
-    public <DbEntity> void saveAsync(final DbEntity dbEntity, final HashMap<String, String> additionalCV, final QueryParameters insertParams, final RequestParameters requestParameters) {
+    public <DbEntity> void saveAsync(final DbEntity dbEntity, final ContentValues contentValues, final QueryParameters insertParams, final RequestParameters requestParameters) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                save(dbEntity, additionalCV, insertParams, requestParameters);
+                save(dbEntity, contentValues, insertParams, requestParameters);
             }
         }).start();
     }
@@ -158,7 +159,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
      * @param dbEntity entity to save into db
      * @return id of saved object if save, state UPDATED if updated, state FAILURE if fault
      */
-    public <DbEntity> long save(DbEntity dbEntity, HashMap<String, String> additionalCV, QueryParameters insertParams, RequestParameters requestParameters) {
+    public <DbEntity> long save(DbEntity dbEntity, ContentValues contentValues, QueryParameters insertParams, RequestParameters requestParameters) {
         if (dbEntity == null)
             return FAILED;
 
@@ -167,11 +168,11 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         Class objectClass = dbEntity.getClass();
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(objectClass);
         Object keyValue = GenericDaoHelper.toKeyValue(dbEntity);
-        if (keyValue == null) {
-            return id;
-        }
+        if (keyValue == null) return FAILED;
 
-        ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(dbEntity, additionalCV, insertParams, requestParameters);
+        if(contentValues == null) contentValues = new ContentValues();
+
+        ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(dbEntity, contentValues, insertParams, requestParameters);
         dbHelper.applyBatch(operations);
         dbHelper.notifyChange(scheme, keyValue);
         id = SUCCESS;
@@ -449,7 +450,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     private <DbEntity> void fillEntityWithManyToOneFields(Scheme scheme, DbEntity entity, Class objectClass, String keyValue, RequestParameters requestParameters) {
         for (String manyToOneField : scheme.getManyToOneFields()) {
             Column manyToOneColumn = scheme.getAnnotatedFields().get(manyToOneField);
-            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToOneColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToOneColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
 
@@ -474,7 +475,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     private <DbEntity> void fillEntityWithManyToManyFields(Scheme scheme, DbEntity entity, Class objectClass, String columnName, String keyValue, RequestParameters requestParameters) {
         for (String manyToManyField : scheme.getManyToManyFields()) {
             Column manyToManyColumn = scheme.getAnnotatedFields().get(manyToManyField);
-            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToManyColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
             String manyToManyTable = scheme.getManyToManyTableName(manyToManyColumn);
@@ -503,7 +504,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     private <DbEntity> void fillEntityWithOneToManyFields(Scheme scheme, DbEntity entity, Class objectClass, String columnName, String keyValue, RequestParameters requestParameters) {
         for (String oneToManyField : scheme.getOneToManyFields()) {
             Column oneToManyColumn = scheme.getAnnotatedFields().get(oneToManyField);
-            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
             Scheme oneToManyScheme = GenericDaoHelper.getSchemeInstanceOrThrow(Scheme.getToManyClass(oneToManyColumn));

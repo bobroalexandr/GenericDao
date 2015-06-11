@@ -46,7 +46,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         List<TestChild2> list = Arrays.asList(testChild2_2, testChild2_3);
         testChild1.setChild2s(list);
 
-        GenericDao.getInstance().save(testChild1);
+        GenericDao.getInstance().save(testChild1, null, null, new RequestParameters.Builder().withRequestMode(RequestParameters.RequestMode.JUST_PARENT).withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build());
+        GenericDao.getInstance().save(testChild1, null, null, new RequestParameters.Builder().withRequestMode(RequestParameters.RequestMode.JUST_NESTED).withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build());
         GenericDao.getInstance().save(testChild2);
 
         RequestParameters.Builder builder = new RequestParameters.Builder()

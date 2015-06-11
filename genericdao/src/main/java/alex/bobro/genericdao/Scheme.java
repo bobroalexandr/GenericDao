@@ -5,7 +5,6 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.text.TextUtils;
-import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -72,6 +71,7 @@ public class Scheme {
                     SchemeInstancesHolder.INSTANCES.put(tableName, scheme = new Scheme(objectClass));
                 }
                 scheme.addAllFieldsFrom(objectClass);
+                scheme.addClass(objectClass);
             }
         }
 
@@ -82,7 +82,7 @@ public class Scheme {
 
 
     final String name;
-    final Class<?> modelClass;
+    final Set<Class> modelClasses;
     private Map<Class, List<Field>> allFields;
     private Map<String, Column> annotatedFields;
 
@@ -95,8 +95,8 @@ public class Scheme {
 
     private Set<Scheme> foreignSchemes;
 
-    public Scheme(Class<?> modelClass) throws ClassCastException, IllegalArgumentException {
-        this.modelClass = modelClass;
+    private Scheme(Class<?> modelClass) throws ClassCastException, IllegalArgumentException {
+        modelClasses = new HashSet<>();
         TableAnnotation table = modelClass.getAnnotation(TableAnnotation.class);
         if (table == null) {
             throw new IllegalArgumentException("Scheme candidate class must use Table annotation");
@@ -161,11 +161,15 @@ public class Scheme {
         return foreignSchemes;
     }
 
-    public void fillColumnsMap() {
+    public Set<Class> getModelClasses() {
+        return modelClasses;
+    }
+
+    private void fillColumnsMap() {
         List<Field> fieldList = new ArrayList<>();
         for (Class key : allFields.keySet()) {
             for (Field field : allFields.get(key)) {
-                if(!CollectionUtils.contains(fieldList, field, fieldNameComparator)) {
+                if(!CollectionUtils.contains(fieldList, field, FIELD_NAME_COMPARATOR)) {
                     fieldList.add(field);
                 }
             }
@@ -192,7 +196,11 @@ public class Scheme {
         }
     }
 
-    public void addAllFieldsFrom(Class<?> genericDaoClass) {
+    private void addClass(Class clazz) {
+        modelClasses.add(clazz);
+    }
+
+    private void addAllFieldsFrom(Class<?> genericDaoClass) {
         List<Field> classFields = new ArrayList<>();
         Class current = genericDaoClass;
         while (!current.equals(Object.class)) {
@@ -221,7 +229,7 @@ public class Scheme {
         throw new Error("field not found");
     }
 
-    public static final Comparator<Field> fieldNameComparator = new Comparator<Field>() {
+    public static final Comparator<Field> FIELD_NAME_COMPARATOR = new Comparator<Field>() {
         @Override
         public int compare(Field lhs, Field rhs) {
             return lhs.getName().compareTo(rhs.getName());
@@ -358,7 +366,7 @@ public class Scheme {
         StringBuilder stringBuilder = new StringBuilder(initial);
         for (String fieldName : getManyToOneFields()) {
             Column manyToOneColumn = getAnnotatedFields().get(fieldName);
-            if (parentColumn != null && !CollectionUtils.contains(getAllFields().get(parentColumn.getConnectedField().getType()), manyToOneColumn.getConnectedField(), Scheme.fieldNameComparator)) {
+            if (parentColumn != null && !CollectionUtils.contains(getAllFields().get(parentColumn.getConnectedField().getType()), manyToOneColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
 
