@@ -1,6 +1,7 @@
 package dev.androidutilities;
 
 import android.app.ActionBar;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -12,15 +13,20 @@ import android.view.View;
 import android.view.WindowManager;
 
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 
+import alex.bobro.genericdao.GenericContentProvider;
 import alex.bobro.genericdao.GenericDao;
+import alex.bobro.genericdao.GenericDaoContentProvider;
+import alex.bobro.genericdao.QueryParameters;
 import alex.bobro.genericdao.RequestParameters;
 import alex.bobro.genericdao.util.Reflection;
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
+import dev.androidutilities.model.TestEntity;
 import dev.androidutilities.model.TestParent;
 
 
@@ -58,11 +64,34 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         Log.i("test!","dsa");
     }
 
+    private void benchMarkSave() {
+        GenericDao.getInstance().delete(TestEntity.class);
+        long time = System.currentTimeMillis();
+        List<TestEntity> entities = generateEnteties();
+        GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
+                new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
+        Log.i("tEST!","total = " + (System.currentTimeMillis() - time));
+    }
+
+    private List<TestEntity> generateEnteties() {
+        List<TestEntity> entities = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            entities.add(new TestEntity(Utils.getRandomString(100), Utils.getRandomString(100), Utils.getRandomInt(100), Utils.getRandomLong()));
+        }
+        return entities;
+    }
+
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btnSave:
-                saveItems();
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        benchMarkSave();
+//                        saveItems();
+                    }
+                }).start();
                 break;
         }
     }

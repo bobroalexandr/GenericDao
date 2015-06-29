@@ -2,7 +2,7 @@
  * Copyright (C) 2015 android10.org. All rights reserved.
  * @author Fernando Cejas (the android10 coder)
  */
-package dev.androidutilities.mvp;
+package dev.androidutilities;
 
 import android.app.Application;
 import android.util.Log;
@@ -13,6 +13,8 @@ import alex.bobro.genericdao.Scheme;
 
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
+import dev.androidutilities.model.TestEntity;
+
 /**
  * Android Main Application
  */
@@ -29,7 +31,7 @@ public class BaseApplication extends Application {
         super.onCreate();
         instance = this;
         Log.i("test!", "BaseApplication");
-        Scheme.init(TestChild1.class, TestChild2.class);
+        Scheme.init(TestChild1.class, TestChild2.class, TestEntity.class);
         ContextContentProvider testContentProvider = new ContextContentProvider(this);
         GenericDao.init(testContentProvider);
     }

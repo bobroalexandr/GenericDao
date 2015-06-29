@@ -9,6 +9,7 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import alex.bobro.genericdao.util.OutValue;
+import alex.bobro.genericdao.util.Reflection;
 
 /**
  * Created by alex on 24.11.14.
@@ -85,13 +87,15 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
         Uri resultUri = uri;
 
         long id = -1;
-        if(scheme == null) {
+        if(scheme == null || TextUtils.isEmpty(scheme.getKeyField())) {
             id = TextUtils.isEmpty(conflictAlgorithm) ? db.insert(table, null, values) : db.insertWithOnConflict(table, null, values, Integer.parseInt(conflictAlgorithm));
         } else {
             String keyField = scheme.getKeyFieldName();
             String keyValue = String.valueOf(values.get(keyField));
 
-            if(!isExists(db, table, keyField, keyValue)) {
+            if(!TextUtils.isEmpty(conflictAlgorithm)) {
+                id = db.insertWithOnConflict(table, null, values, Integer.parseInt(conflictAlgorithm));
+            } else if(!isExists(db, table, keyField, keyValue)) {
                 id = db.insert(table, null, values);
             } else {
                 id = update(uri, values, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
@@ -151,26 +155,29 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
     public int bulkInsert(Uri uri, ContentValues[] values) {
         SQLiteDatabase db = getDbHelper().getWritableDatabase();
         String table = UriHelper.getTable(uri);
+        Scheme scheme = Scheme.getSchemeInstance(table);
+        String keyField = scheme.getKeyField();
         String conflictAlgorithm = uri.getQueryParameter(CONFLICT_ALGORITHM);
 
-        int count = 0;
         db.beginTransaction();
         try {
             for (ContentValues value : values) {
-                if(TextUtils.isEmpty(conflictAlgorithm))
-                    db.insert(table, null, value);
-                else
-                    db.insertWithOnConflict(table, null, value, Integer.parseInt(conflictAlgorithm));
-
-                count++;
+                String keyValue;
+                if(!TextUtils.isEmpty(keyField) && TextUtils.isEmpty(conflictAlgorithm) && !isExists(db, table, keyField, keyValue = value.getAsString(keyField))) {
+                    db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[] {keyValue});
+                } else {
+                    int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
+                    db.insertWithOnConflict(table, null, value, algorithm);
+                }
             }
             db.setTransactionSuccessful();
             notifyUri(uri);
         } finally {
             db.endTransaction();
         }
-        return count;
+        return values.length;
     }
+
 
     @Override
     public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {

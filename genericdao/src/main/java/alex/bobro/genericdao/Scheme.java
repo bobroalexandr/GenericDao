@@ -165,6 +165,10 @@ public class Scheme {
         return modelClasses;
     }
 
+    public boolean hasNestedObjects() {
+        return !getManyToManyFields().isEmpty() || !getOneToManyFields().isEmpty() || !getManyToOneFields().isEmpty();
+    }
+
     private void fillColumnsMap() {
         List<Field> fieldList = new ArrayList<>();
         for (Class key : allFields.keySet()) {

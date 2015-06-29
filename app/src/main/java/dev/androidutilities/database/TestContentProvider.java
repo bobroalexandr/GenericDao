@@ -7,7 +7,7 @@ import java.util.List;
 
 import alex.bobro.genericdao.GenericDaoContentProvider;
 import alex.bobro.genericdao.GenericDaoSQLiteHelper;
-import dev.androidutilities.mvp.BaseApplication;
+import dev.androidutilities.BaseApplication;
 
 /**
  * Created by alex on 5/13/15.

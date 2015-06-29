@@ -45,6 +45,10 @@ public class Column {
         this.scheme = scheme;
     }
 
+    public Scheme getScheme() {
+        return scheme;
+    }
+
     public String getFullName() {
         return scheme.getName() + "." + getName();
     }
