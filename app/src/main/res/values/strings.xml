@@ -3,4 +3,15 @@
 
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+
+    <string name="idle">Idle</string>
+    <string name="start">Start</string>
+    <string name="running">Executing %1$s…</string>
+    <string name="save_entities">Save entities</string>
+    <string name="load_entities">Load entities</string>
+    <string name="save_entities_in_transaction">Save entities in transaction</string>
+    <string name="load_entity_by_id">Load entity by id</string>
+    <string name="results">Results:</string>
+    <string name="csv_was_generated">CSV file was generated at %1$s</string>
+    <string name="failed_to_generate_csv">Failed to generate CSV file: %1$s</string>
 </resources>

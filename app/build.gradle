@@ -1,23 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'de.mobilej.unmock'
+apply plugin: 'com.neenbedankt.android-apt'
 
-
-allprojects {
-    repositories {
-        jcenter()
-        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
-    }
-}
-
-buildscript {
-    repositories {
-        jcenter()
-    }
-
-    dependencies {
-        classpath 'de.mobilej.unmock:UnMockPlugin:0.1.1'
-    }
-}
 
 
 android {
@@ -73,6 +57,10 @@ unMock {
 }
 
 dependencies {
+    apt 'com.raizlabs.android:DBFlow-Compiler:2.1.0'
+    compile "com.raizlabs.android:DBFlow-Core:2.1.0"
+    compile "com.raizlabs.android:DBFlow:2.1.0"
+
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.android.support:appcompat-v7:21.0.3'
     compile 'org.glassfish:javax.annotation:10.0-b28'
