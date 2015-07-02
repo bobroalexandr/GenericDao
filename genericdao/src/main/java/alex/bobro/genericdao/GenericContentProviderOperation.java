@@ -8,8 +8,10 @@ import android.net.Uri;
 
 public class GenericContentProviderOperation {
 
+    public static String KEY_CONTENT_OPERATION_TYPE = "content_operation_type";
+
     public enum Type {
-        INSERT, DELETE, UPDATE;
+        INSERT, DELETE, UPDATE
     }
 
     private Type type;
@@ -22,6 +24,22 @@ public class GenericContentProviderOperation {
         this.table = builder.table;
         this.contentValues = builder.contentValues;
         this.queryParameters = builder.queryParameters;
+    }
+
+    public String getTable() {
+        return table;
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public ContentValues getContentValues() {
+        return contentValues;
+    }
+
+    public QueryParameters getQueryParameters() {
+        return queryParameters;
     }
 
     public static Builder newInsert() {

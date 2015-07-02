@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.text.TextUtils;
+import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -23,6 +24,7 @@ import alex.bobro.genericdao.entities.FieldType;
 import alex.bobro.genericdao.entities.RelationType;
 import alex.bobro.genericdao.util.CollectionUtils;
 import alex.bobro.genericdao.util.OutValue;
+import alex.bobro.genericdao.util.QueryBuilder;
 import alex.bobro.genericdao.util.Reflection;
 
 @SuppressWarnings({"unused"})
@@ -155,12 +157,14 @@ public class GenericDaoHelper {
 
     public static String toKeyValue(Object value) {
         Scheme scheme = getSchemeInstanceOrThrow(value.getClass());
+        return toKeyValue(scheme, value);
+    }
+
+    public static String toKeyValue(Scheme scheme, Object value) {
+        if(TextUtils.isEmpty(scheme.getKeyField())) return null;
+
 
         String[] keyFields = new String[]{scheme.getKeyField()};
-        if (keyFields.length == 0) {
-            return null;
-        }
-
         StringBuilder builder = new StringBuilder();
 
         for (int i = 0; i < keyFields.length; i++) {
@@ -180,19 +184,17 @@ public class GenericDaoHelper {
 
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> void fillCvFromEntity(ContentValues contentValues, @NotNull DbEntity dbEntity, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters) {
+    public static <DbEntity> void fillCvFromEntity(Scheme scheme, ContentValues contentValues, @NotNull DbEntity dbEntity, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters) {
         if (requestParameters == null) {
             requestParameters = new RequestParameters.Builder().build();
         }
 
         Class objectClass = dbEntity.getClass();
-        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
-
-        contentValues.put(Scheme.COLUMN_OBJECT_CLASS_NAME, dbEntity.getClass().getName());
+        contentValues.put(Scheme.COLUMN_OBJECT_CLASS_NAME, objectClass.getName());
 
         for (String fieldKey : scheme.getAnnotatedFields().keySet()) {
             Column column = scheme.getAnnotatedFields().get(fieldKey);
-            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
+            if (scheme.getAllFields().size() > 1 && !CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
             if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType())) {
@@ -208,7 +210,6 @@ public class GenericDaoHelper {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
         }
     }
 
@@ -305,14 +306,11 @@ public class GenericDaoHelper {
             return contentProviderOperationList;
 
         Field field = column.getConnectedField();
-        if (!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
+        if (scheme.getAllFields().size() > 1 && !field.getDeclaringClass().isAssignableFrom(object.getClass())) {
             field = Scheme.getFieldByNameFrom(object.getClass(), field.getName());
         }
 
         Object fieldValue = GenericDaoHelper.getValueForField(object.getClass(), object, field);
-        if (fieldValue == null && scheme.getKeyField() != null && TextUtils.equals(scheme.getKeyField(), field.getName()))
-            fieldValue = "";
-
         if (fieldValue == null)
             return contentProviderOperationList;
 
@@ -379,8 +377,9 @@ public class GenericDaoHelper {
     private static void putObjectIntoCv(Column column, ContentValues cv, Object fieldValue, RequestParameters requestParameters, Field field, String name,
                                         List<GenericContentProviderOperation> contentProviderOperationList) {
         if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-            if(requestParameters.isManyToOneGotWithParent()) contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldValue, null, null, requestParameters));
-            cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldValue));
+            Scheme fieldScheme = Scheme.getSchemeInstance(fieldValue.getClass());
+            if(requestParameters.isManyToOneGotWithParent()) contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
+            cv.put(column.getName(), GenericDaoHelper.toKeyValue(column.getParentScheme(), fieldValue));
         } else if (fieldValue instanceof List) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
             FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
@@ -472,32 +471,27 @@ public class GenericDaoHelper {
         return null;
     }
 
-    static <DbEntity> ArrayList<GenericContentProviderOperation> getContentProviderOperationBatch(DbEntity dbEntity, ContentValues contentValues, QueryParameters insertParams, RequestParameters requestParameters) {
+    static <DbEntity> ArrayList<GenericContentProviderOperation> getContentProviderOperationBatch(Scheme scheme, DbEntity dbEntity, ContentValues contentValues, QueryParameters insertParams, RequestParameters requestParameters) {
         if (requestParameters == null) requestParameters = new RequestParameters.Builder().build();
         if (contentValues == null) contentValues = new ContentValues();
 
         ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
 
-        Class objectClass = dbEntity.getClass();
-        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
-        Object keyValue = GenericDaoHelper.toKeyValue(dbEntity);
-        if (keyValue == null) {
-            return null;
-        }
+        Object keyValue = GenericDaoHelper.toKeyValue(scheme, dbEntity);
+        if (keyValue == null && scheme.hasNestedObjects()) throw new Error("Key value can't be null for object with connections");
 
         if (!RequestParameters.RequestMode.JUST_NESTED.equals(requestParameters.getRequestMode())) {
             GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
-            GenericDaoHelper.fillCvFromEntity(contentValues, dbEntity,  contentProviderOperations, requestParameters);
+            GenericDaoHelper.fillCvFromEntity(scheme, contentValues, dbEntity, contentProviderOperations, requestParameters);
             builder.withContentValues(contentValues)
                     .withQueryParameters(insertParams)
                     .withTable(scheme.getName());
             contentProviderOperations.add(builder.build());
         }
 
-        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
-            contentProviderOperations.addAll(getNestedContentProviderOperationBatch(dbEntity, requestParameters));
+        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
+            contentProviderOperations.addAll(getNestedContentProviderOperationBatch(scheme, dbEntity, requestParameters));
         }
-
         return contentProviderOperations;
     }
 
@@ -513,6 +507,7 @@ public class GenericDaoHelper {
             if (value == null)
                 continue;
 
+            Scheme oneToManyScheme = oneToManyColumn.getScheme();
             //noinspection unchecked
             List list = new ArrayList((List) value);
             for (Object object : list) {
@@ -521,7 +516,7 @@ public class GenericDaoHelper {
                     contentValues.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
                 }
                 //noinspection unchecked
-                contentProviderOperations.addAll(getContentProviderOperationBatch(object, contentValues, null, nestedParameters));
+                contentProviderOperations.addAll(getContentProviderOperationBatch(oneToManyScheme, object, contentValues, null, nestedParameters));
             }
         }
     }
@@ -538,7 +533,8 @@ public class GenericDaoHelper {
             if (value == null)
                 continue;
 
-            contentProviderOperations.addAll(getContentProviderOperationBatch(value, null, null, null));
+            Scheme manyToOneScheme = oneToManyColumn.getScheme();
+            contentProviderOperations.addAll(getContentProviderOperationBatch(manyToOneScheme, value, null, null, null));
         }
     }
 
@@ -554,14 +550,15 @@ public class GenericDaoHelper {
             if (value == null)
                 continue;
 
+            Scheme manyToManyScheme = manyToManyColumn.getScheme();
             List list = (List) value;
             for (Object object : list) {
                 //noinspection unchecked
-                contentProviderOperations.addAll(getContentProviderOperationBatch(object, null, null, nestedParameters));
+                contentProviderOperations.addAll(getContentProviderOperationBatch(manyToManyScheme,object, null, null, nestedParameters));
 
                 ContentValues manyToManyCV = new ContentValues();
                 manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
-                manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(Scheme.getToManyClassName(manyToManyColumn)), GenericDaoHelper.toKeyValue(object));
+                manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(Scheme.getToManyClassName(manyToManyColumn)), GenericDaoHelper.toKeyValue(manyToManyScheme, object));
 
                 QueryParameters.Builder queryBuilder = new QueryParameters.Builder();
                 queryBuilder.addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_IGNORE));
@@ -575,15 +572,14 @@ public class GenericDaoHelper {
         }
     }
 
-    static <DbEntity> List<GenericContentProviderOperation> getNestedContentProviderOperationBatch(DbEntity dbEntity, RequestParameters requestParameters) {
+    static <DbEntity> List<GenericContentProviderOperation> getNestedContentProviderOperationBatch(Scheme scheme, DbEntity dbEntity, RequestParameters requestParameters) {
         List<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
         if (dbEntity == null) return contentProviderOperations;
 
         Class objectClass = dbEntity.getClass();
-        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
         RequestParameters nestedParameters = new RequestParameters.Builder().withRequestMode(RequestParameters.RequestMode.FULL).build();
 
-        String keyValue = GenericDaoHelper.toKeyValue(dbEntity);
+        String keyValue = GenericDaoHelper.toKeyValue(scheme, dbEntity);
         if (TextUtils.isEmpty(keyValue))
             return contentProviderOperations;
 
@@ -637,6 +633,23 @@ public class GenericDaoHelper {
         } finally {
             cursor.close();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static String generateInsertQuery(String tableName, ContentValues contentValues) {
+        QueryBuilder stringBuilder = new QueryBuilder("INSERT INTO ")
+                .appendQuoted(tableName).appendSpace().append("(");
+
+        List<String> columnNames = new ArrayList<>();
+        List<String> bindings = new ArrayList<>();
+        for (String key : contentValues.keySet()) {
+            columnNames.add(key);
+            bindings.add("?");
+        }
+
+        stringBuilder.appendQuotedList(columnNames).append(") VALUES (");
+        stringBuilder.appendList(bindings).append(")");
+        return stringBuilder.toString();
     }
 
 }

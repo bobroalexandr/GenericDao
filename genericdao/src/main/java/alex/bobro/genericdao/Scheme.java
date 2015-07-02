@@ -165,6 +165,10 @@ public class Scheme {
         return modelClasses;
     }
 
+    public boolean hasNestedObjects() {
+        return !getManyToManyFields().isEmpty() || !getOneToManyFields().isEmpty() || !getManyToOneFields().isEmpty();
+    }
+
     private void fillColumnsMap() {
         List<Field> fieldList = new ArrayList<>();
         for (Class key : allFields.keySet()) {
@@ -180,18 +184,22 @@ public class Scheme {
         for (Field field : fieldList) {
             if (field.isAnnotationPresent(FieldAnnotation.class)) {
                 FieldAnnotation fieldAnnotation = field.getAnnotation(FieldAnnotation.class);
-                Column column = new Column(fieldAnnotation, field, this);
-                annotatedFields.put(column.getName(), column);
+                Scheme connectedScheme = null;
                 if (RelationType.MANY_TO_MANY.equals(fieldAnnotation.relation())) {
+                    connectedScheme = GenericDaoHelper.getSchemeInstanceOrThrow(Scheme.getToManyClass(field));
                     manyToManyFields.add(field.getName());
                 } else if (RelationType.ONE_TO_MANY.equals(fieldAnnotation.relation())) {
+                    connectedScheme = GenericDaoHelper.getSchemeInstanceOrThrow(Scheme.getToManyClass(field));
                     oneToManyFields.add(field.getName());
                 } else if (RelationType.MANY_TO_ONE.equals(fieldAnnotation.relation())) {
+                    connectedScheme = GenericDaoHelper.getSchemeInstanceOrThrow(field.getType());
                     manyToOneFields.add(field.getName());
-                    if(!ForeignKeyActions.NO_ACTION.equals(column.getForeignKeyActions())) {
-                        Scheme.getSchemeInstance(column.getConnectedField().getType()).foreignSchemes.add(this);
+                    if(!ForeignKeyActions.NO_ACTION.equals(fieldAnnotation.foreignKeyAction())) {
+                        connectedScheme.foreignSchemes.add(this);
                     }
                 }
+                Column column = new Column(fieldAnnotation, field, this, connectedScheme);
+                annotatedFields.put(column.getName(), column);
             }
         }
     }
@@ -341,13 +349,17 @@ public class Scheme {
         return isClassNameFirst ? (className + "_" + manyToManyClassName) : (manyToManyClassName + "_" + className);
     }
 
-    public static Class getToManyClass(Column manyToManyColumn) {
-        Class<?> manyToManyFieldClass = manyToManyColumn.getConnectedField().getType();
+    public static Class getToManyClass(Field field) {
+        Class<?> manyToManyFieldClass = field.getType();
         if (List.class.isAssignableFrom(manyToManyFieldClass)) {
-            manyToManyFieldClass = (Class<?>) ((ParameterizedType) manyToManyColumn.getConnectedField().getGenericType()).getActualTypeArguments()[0];
+            manyToManyFieldClass = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
         }
 
         return manyToManyFieldClass;
+    }
+
+    public static Class getToManyClass(Column manyToManyColumn) {
+        return getToManyClass(manyToManyColumn.getConnectedField());
     }
 
     public static String getToManyClassName(Column manyToManyColumn) {

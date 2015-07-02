@@ -17,6 +17,7 @@ public class Column {
     ForeignKeyActions foreignKeyActions;
 
     Field connectedField;
+    Scheme parentScheme;
     Scheme scheme;
 
     public Column(String name) {
@@ -37,16 +38,25 @@ public class Column {
         this(fieldAnnotation.name(), fieldAnnotation.dbType(), fieldAnnotation.additional(), fieldAnnotation.relation(), fieldAnnotation.foreignKeyAction());
     }
 
-    public Column(FieldAnnotation fieldAnnotation, Field connectedField, Scheme scheme) {
+    public Column(FieldAnnotation fieldAnnotation, Field connectedField, Scheme parentScheme, Scheme scheme) {
         this(fieldAnnotation);
         this.connectedField = connectedField;
         if(TextUtils.isEmpty(name))
             name = connectedField.getName();
+        this.parentScheme = parentScheme;
         this.scheme = scheme;
     }
 
+    public Scheme getScheme() {
+        return scheme;
+    }
+
+    public Scheme getParentScheme() {
+        return parentScheme;
+    }
+
     public String getFullName() {
-        return scheme.getName() + "." + getName();
+        return parentScheme.getName() + "." + getName();
     }
 
     public String getName() {

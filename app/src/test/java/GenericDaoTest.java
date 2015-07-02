@@ -55,8 +55,9 @@ public class GenericDaoTest {
     public void checkToCvMethod() {
         TestChild1 testChild1 = new TestChild1(0, "child1_name", "child1_f1", "child1_f2");
 
+        Scheme scheme = Scheme.getSchemeInstance(TestChild1.class);
         ContentValues contentValues = new ContentValues();
-        GenericDaoHelper.fillCvFromEntity(contentValues, testChild1, new ArrayList<GenericContentProviderOperation>(), null);
+        GenericDaoHelper.fillCvFromEntity(scheme, contentValues, testChild1, new ArrayList<GenericContentProviderOperation>(), null);
         assertThat(contentValues.size(), is(5));
         assertThat(contentValues.get(Scheme.COLUMN_OBJECT_CLASS_NAME).toString(),is(TestChild1.class.getName()));
     }

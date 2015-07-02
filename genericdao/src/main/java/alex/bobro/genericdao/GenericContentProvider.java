@@ -9,42 +9,44 @@ import java.util.ArrayList;
 
 public interface GenericContentProvider {
 
-    public long insert(String table, String nullColumnHack, ContentValues values, QueryParameters parameters);
+    long insert(String table, String nullColumnHack, ContentValues values, QueryParameters parameters);
 
-    public int bulkInsert(String table, ContentValues[] values, QueryParameters parameters);
+    int bulkInsert(String table, ContentValues[] values, QueryParameters parameters);
 
-    public int update(String table, ContentValues values, String whereClause, String[] whereArgs, QueryParameters parameters);
+    int update(String table, ContentValues values, String whereClause, String[] whereArgs, QueryParameters parameters);
 
-    public int delete(String table, String whereClause, String[] whereArgs, QueryParameters parameters);
+    int delete(String table, String whereClause, String[] whereArgs, QueryParameters parameters);
 
-    public Cursor query(String table, String[] columns, String selection,
-                        String[] selectionArgs, String groupBy, String having,
-                        String orderBy, String limit, QueryParameters parameters);
+    Cursor query(String table, String[] columns, String selection,
+                 String[] selectionArgs, String groupBy, String having,
+                 String orderBy, String limit, QueryParameters parameters);
 
-    public Cursor query(boolean distinct, String table, String[] columns, String selection,
-                        String[] selectionArgs, String groupBy, String having,
-                        String orderBy, String limit, QueryParameters parameters);
+    Cursor query(boolean distinct, String table, String[] columns, String selection,
+                 String[] selectionArgs, String groupBy, String having,
+                 String orderBy, String limit, QueryParameters parameters);
 
-    public abstract long insert(String table, String nullColumnHack, ContentValues values);
+    long insert(String table, String nullColumnHack, ContentValues values);
 
 
-    public abstract int bulkInsert(String table, ContentValues[] values);
+    int bulkInsert(String table, ContentValues[] values);
 
-    public abstract int update(String table, ContentValues values, String whereClause, String[] whereArgs);
+    int update(String table, ContentValues values, String whereClause, String[] whereArgs);
 
-    public abstract int delete(String table, String whereClause, String[] whereArgs);
+    int delete(String table, String whereClause, String[] whereArgs);
 
-    public abstract Cursor query(String table, String[] columns, String selection,
-                                 String[] selectionArgs, String groupBy, String having,
-                                 String orderBy, String limit);
+    Cursor query(String table, String[] columns, String selection,
+                 String[] selectionArgs, String groupBy, String having,
+                 String orderBy, String limit);
 
-    public abstract Cursor query(String table, String[] columns, String selection,
-                                 String[] selectionArgs, String groupBy, String having,
-                                 String orderBy);
+    Cursor query(String table, String[] columns, String selection,
+                 String[] selectionArgs, String groupBy, String having,
+                 String orderBy);
 
-    public ContentProviderResult[] applyBatch(ArrayList<GenericContentProviderOperation> operations);
+    ContentProviderResult[] applyBatch(ArrayList<GenericContentProviderOperation> operations);
 
-    public void notifyChange(Scheme scheme);
+    void notifyChange(Scheme scheme);
 
-    public void notifyChange(Scheme scheme, Object id);
+    void notifyChange(Scheme scheme, Object id);
+
+
 }

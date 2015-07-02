@@ -2,7 +2,9 @@ package alex.bobro.genericdao;
 
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Pair;
 
 import org.jetbrains.annotations.NotNull;
@@ -12,7 +14,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -64,7 +68,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     }
 
     public <DbEntity> boolean saveCollection(Collection<DbEntity> entities) {
-        return saveCollection(entities, null);
+        return saveCollection(entities, null, null);
     }
 
     public <DbEntity> void saveCollectionAsync(final Collection<DbEntity> entities) {
@@ -76,11 +80,11 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         }).start();
     }
 
-    public <DbEntity> void saveCollectionAsync(final Collection<DbEntity> entities, final RequestParameters requestParameters) {
+    public <DbEntity> void saveCollectionAsync(final Collection<DbEntity> entities, final RequestParameters requestParameters, final QueryParameters insertParams) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                saveCollection(entities, requestParameters);
+                saveCollection(entities, requestParameters, insertParams);
             }
         }).start();
     }
@@ -91,37 +95,36 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
      * @param entities The list of entities to save into db
      * @return true if success or false if failure
      */
-    public <DbEntity> boolean saveCollection(Collection<DbEntity> entities, RequestParameters requestParameters) {
-        if (requestParameters == null) {
-            requestParameters = new RequestParameters.Builder().build();
-        }
+    public <DbEntity> boolean saveCollection(Collection<DbEntity> entities, RequestParameters requestParameters, QueryParameters insertParams) {
+        if (requestParameters == null)  requestParameters = new RequestParameters.Builder().build();
+        if (insertParams == null) insertParams = new QueryParameters.Builder().build();
 
         if (entities == null || entities.isEmpty())
             return false;
 
         RequestParameters.NotificationMode notificationMode = requestParameters.getNotificationMode();
+        boolean isAfterAll = RequestParameters.NotificationMode.AFTER_ALL.equals(notificationMode);
         try {
-            ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
+            ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>(entities.size());
             Scheme scheme = null;
             for (DbEntity entity : entities) {
                 if (scheme == null)
                     scheme = GenericDaoHelper.getSchemeInstanceOrThrow(entity.getClass());
-                ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(entity, null, null, requestParameters);
+                ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(scheme, entity, null, insertParams, requestParameters);
 
-                if (RequestParameters.NotificationMode.AFTER_ALL.equals(notificationMode)) {
+                if (isAfterAll) {
                     contentProviderOperations.addAll(operations);
                 } else {
-                    dbHelper.applyBatch(operations);
-                    Object keyValue = GenericDaoHelper.toKeyValue(entity);
+                    bulkInsertGenericOperations(operations, insertParams);
+                    Object keyValue = GenericDaoHelper.toKeyValue(scheme, entity);
                     dbHelper.notifyChange(scheme, keyValue);
                 }
             }
 
             if (RequestParameters.NotificationMode.AFTER_ALL.equals(requestParameters.getNotificationMode())) {
-                dbHelper.applyBatch(contentProviderOperations);
+                bulkInsertGenericOperations(contentProviderOperations, insertParams);
                 dbHelper.notifyChange(scheme);
             }
-
             return true;
 
         } catch (Exception e) {
@@ -129,6 +132,30 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         }
 
         return false;
+    }
+
+    private void bulkInsertGenericOperations(ArrayList<GenericContentProviderOperation> contentProviderOperations, QueryParameters queryParameters) {
+        Map<String, Pair<QueryParameters,List<ContentValues>>> map = groupContentProviderBatches(contentProviderOperations);
+        for (String key : map.keySet()) {
+            Pair<QueryParameters,List<ContentValues>> pair = map.get(key);
+            dbHelper.bulkInsert(key, pair.second.toArray(new ContentValues[pair.second.size()]), pair.first);
+        }
+    }
+
+    private Map<String, Pair<QueryParameters,List<ContentValues>>> groupContentProviderBatches(List<GenericContentProviderOperation> operations) {
+        Map<String, Pair<QueryParameters,List<ContentValues>>> map = new LinkedHashMap<>();
+        for (GenericContentProviderOperation operation : operations) {
+            String table = operation.getTable();
+            Pair<QueryParameters,List<ContentValues>> pair = map.get(table);
+            if(pair == null) {
+                List<ContentValues> list = new ArrayList<>();
+                pair = new Pair<>(operation.getQueryParameters(), list);
+                map.put(table, pair);
+            }
+
+            pair.second.add(operation.getContentValues());
+        }
+        return map;
     }
 
     public <DbEntity> long save(DbEntity dbEntity) {
@@ -163,21 +190,18 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         if (dbEntity == null)
             return FAILED;
 
-        long id = FAILED;
-
         Class objectClass = dbEntity.getClass();
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(objectClass);
-        Object keyValue = GenericDaoHelper.toKeyValue(dbEntity);
-        if (keyValue == null) return FAILED;
+        Object keyValue = GenericDaoHelper.toKeyValue(scheme, dbEntity);
+        if (keyValue == null && scheme.hasNestedObjects()) throw new Error("Key value can't be null for object with connections");
 
         if(contentValues == null) contentValues = new ContentValues();
 
-        ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(dbEntity, contentValues, insertParams, requestParameters);
+        ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(scheme, dbEntity, contentValues, insertParams, requestParameters);
         dbHelper.applyBatch(operations);
         dbHelper.notifyChange(scheme, keyValue);
-        id = SUCCESS;
 
-        return id;
+        return SUCCESS;
     }
 
 
