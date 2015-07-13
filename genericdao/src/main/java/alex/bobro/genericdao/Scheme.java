@@ -371,8 +371,8 @@ public class Scheme {
         return builder.addTable(getName()).build();
     }
 
-    public String createJoinClause(String tableAsName, Column parentColumn, OutValue<Integer> initNumber) {
-        String newName = getName() + (parentColumn == null ? "" : initNumber.value++);
+    public String createJoinClause(String tableAsName, Column parentColumn) {
+        String newName = (parentColumn == null) ? getName() : parentColumn.getName();
         String initial = parentColumn == null ? getName() + " AS " + newName :
                 String.format(JOIN_TEMPLATE, getName() + " AS " + newName, tableAsName + "." + parentColumn.getName(), newName + "." + getKeyFieldName());
         StringBuilder stringBuilder = new StringBuilder(initial);
@@ -382,31 +382,35 @@ public class Scheme {
                 continue;
             }
 
-            Scheme manyToOneColumnScheme = Scheme.getSchemeInstance(manyToOneColumn.getConnectedField().getType());
-            if(this.equals(manyToOneColumnScheme) && initNumber.value > 0) continue;
+            Scheme manyToOneColumnScheme = GenericDaoHelper.getSchemeInstanceOrThrow(manyToOneColumn.getConnectedField().getType());
+            if(this.equals(manyToOneColumnScheme) && parentColumn != null) continue;
 
-            stringBuilder.append(manyToOneColumnScheme.createJoinClause(newName, manyToOneColumn, initNumber));
+            stringBuilder.append(manyToOneColumnScheme.createJoinClause(newName, manyToOneColumn));
         }
 
         return stringBuilder.toString();
     }
 
-    public String[] getProjection() {
-        List<String> projection = new ArrayList<>(getColumnsListFromScheme());
+    public String[] getProjection(Column parentColumn) {
+        List<String> projection = new ArrayList<>(getColumnsListFromScheme(parentColumn));
         for (String fieldName : getManyToOneFields()) {
             Column manyToOneColumn = getAnnotatedFields().get(fieldName);
-            Scheme manyToOneColumnScheme = Scheme.getSchemeInstance(manyToOneColumn.getConnectedField().getType());
+            if (parentColumn != null && !CollectionUtils.contains(getAllFields().get(parentColumn.getConnectedField().getType()), manyToOneColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
+                continue;
+            }
 
-            projection.addAll(manyToOneColumnScheme.getColumnsListFromScheme());
+            Scheme manyToOneColumnScheme = GenericDaoHelper.getSchemeInstanceOrThrow(manyToOneColumn.getConnectedField().getType());
+            projection.addAll(manyToOneColumnScheme.getColumnsListFromScheme(manyToOneColumn));
         }
 
         return projection.toArray(new String[projection.size()]);
     }
 
-    public List<String> getColumnsListFromScheme() {
+    public List<String> getColumnsListFromScheme(Column parentColumn) {
         List<String> columns = new ArrayList<>();
+        columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, ".")/* + " AS " + GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn)*/);
         for (Column column : getAnnotatedFields().values()) {
-            columns.add(column.getFullName());
+            columns.add(GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, ".")/* + " AS " + GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn)*/);
         }
 
         return columns;

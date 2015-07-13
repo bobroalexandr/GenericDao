@@ -26,6 +26,10 @@ public class TestEntity {
     @FieldAnnotation
     private long field4;
 
+    public TestEntity() {
+
+    }
+
     public TestEntity(String field1, String field2, int field3, long field4) {
         this.field1 = field1;
         this.field2 = field2;

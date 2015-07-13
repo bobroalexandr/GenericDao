@@ -9,7 +9,7 @@ android {
     buildToolsVersion "21.1.2"
 
     defaultConfig {
-        applicationId "dev.androidutilities"
+        applicationId "dao.test"
         minSdkVersion 14
         targetSdkVersion 21
         versionCode 1

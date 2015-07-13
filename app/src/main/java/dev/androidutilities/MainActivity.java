@@ -63,12 +63,15 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     }
 
     private void benchMarkSave() {
-        GenericDao.getInstance().delete(TestEntity.class);
+//        GenericDao.getInstance().delete(TestEntity.class);
         long time = System.currentTimeMillis();
-        List<TestEntity> entities = generateEnteties();
-        GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
-                new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
-        Log.i("tEST!","total = " + (System.currentTimeMillis() - time));
+//        List<TestEntity> entities = generateEnteties();
+//        GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
+//                new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
+//        Log.i("tEST!", "total = " + (System.currentTimeMillis() - time));
+//        time = System.currentTimeMillis();
+        GenericDao.getInstance().getObjects(TestEntity.class);
+        Log.i("tEST!", "total get = " + (System.currentTimeMillis() - time));
     }
 
     private List<TestEntity> generateEnteties() {
@@ -86,8 +89,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        benchMarkSave();
-//                        saveItems();
+//                        benchMarkSave();
+                        saveItems();
                     }
                 }).start();
                 break;

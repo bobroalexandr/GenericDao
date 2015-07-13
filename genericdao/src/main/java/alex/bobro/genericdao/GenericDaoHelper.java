@@ -214,19 +214,17 @@ public class GenericDaoHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> DbEntity fromCursor(Cursor cursor, Class<DbEntity> dbEntityClass) {
-        return fromCursor(cursor, dbEntityClass, new OutValue<>(0));
+    public static <DbEntity> DbEntity fromCursor(Scheme scheme, Cursor cursor, Class<DbEntity> dbEntityClass) {
+        return fromCursor(scheme, cursor, dbEntityClass, null);
     }
 
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> DbEntity fromCursor(Cursor cursor, Class<DbEntity> dbEntityClass, OutValue<Integer> objectIndex) {
-        if (cursor == null || objectIndex.value >= cursor.getColumnCount())
+    public static <DbEntity> DbEntity fromCursor(Scheme scheme, Cursor cursor, Class<DbEntity> dbEntityClass, Column parentColumn) {
+        if (cursor == null)
             return null;
 
-        List<String> columns = Arrays.asList(cursor.getColumnNames());
-
-        String className = cursor.getString(objectIndex.value);
+        String className = cursor.getString(cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(Scheme.COLUMN_OBJECT_CLASS_NAME, parentColumn)));
         if (TextUtils.isEmpty(className))
             return null;
 
@@ -237,45 +235,28 @@ public class GenericDaoHelper {
             return null;
         }
 
-        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
         Reflection.Creator creator = Reflection.creator(objectClass);
-        DbEntity entity = dbEntityClass.cast(creator.newInstanceFor());
-        if (entity != null) fillEntityWithValues(entity, objectClass, cursor, scheme, objectIndex);
-
+        DbEntity entity = (DbEntity) creator.newInstanceFor();
+        if (entity != null) fillEntityWithValues(entity, objectClass, cursor, scheme, parentColumn);
         return entity;
     }
 
-    private static <DbEntity> void fillEntityWithValues(DbEntity entity, Class<DbEntity> objectClass, Cursor cursor, Scheme scheme, OutValue<Integer> objectIndex) {
-        List<String> columns = Arrays.asList(cursor.getColumnNames());
-        int objectStartIndex = objectIndex.value;
-        int objectFinishIndex = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-        if (objectFinishIndex == -1)
-            objectFinishIndex = columns.size();
-
-        objectIndex.value = objectFinishIndex;
-
-        for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
-            if(i >= columns.size()) return;
-            Column column = scheme.getAnnotatedFields().get(columns.get(i));
-            if (column == null) continue;
+    private static <DbEntity> void fillEntityWithValues(DbEntity entity, Class<DbEntity> objectClass, Cursor cursor, Scheme scheme, Column parentColumn) {
+        for (Column column : scheme.getAnnotatedFields().values()) {
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
 
-            if (cursor.isNull(i)) {
-                if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-                    Scheme manyToOneScheme = getSchemeInstanceOrThrow(column.getConnectedField().getType());
-                    for (int k = 0; k < manyToOneScheme.getManyToOneFields().size() + 1; k++) {
-                        objectIndex.value = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-                    }
-                }
+            int index = cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn));
+            if (cursor.isNull(index)) {
                 continue;
             }
 
             if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType()))
                 continue;
 
-            Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? objectIndex : new OutValue<>(i));
+
+            Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, index, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? column : null);
             GenericDaoHelper.setValueForField(objectClass, entity, column.getConnectedField(), valueForField);
         }
     }
@@ -395,12 +376,11 @@ public class GenericDaoHelper {
     }
 
 
-    public static Object getValueForFieldFromCursor(Column column, Cursor cursor, OutValue<Integer> objectIndex) {
+    public static Object getValueForFieldFromCursor(Column column, Cursor cursor, int index,  Column parentColumn) {
         Field field = column.getConnectedField();
         FieldType fieldType = FieldType.findByTypeClass(field.getType());
 
         Object valueForField = null;
-        int index = objectIndex.value;
         switch (fieldType) {
             case STRING:
                 valueForField = cursor.getString(index);
@@ -447,14 +427,15 @@ public class GenericDaoHelper {
                 break;
 
             case OBJECT:
-                valueForField = getValueFromFieldForObject(field, cursor, index, objectIndex);
+                valueForField = getValueFromFieldForObject(column, cursor, index, parentColumn);
                 break;
         }
 
         return valueForField;
     }
 
-    private static Object getValueFromFieldForObject(Field field, Cursor cursor, int index, OutValue<Integer> objectIndex) {
+    private static Object getValueFromFieldForObject(Column column, Cursor cursor, int index, Column parentColumn) {
+        Field field = column.getConnectedField();
         if (List.class.isAssignableFrom(field.getType())) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
             FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
@@ -465,7 +446,7 @@ public class GenericDaoHelper {
             }
 
         } else {
-            return GenericDaoHelper.fromCursor(cursor, field.getType(), objectIndex);
+            return GenericDaoHelper.fromCursor(column.getScheme(), cursor, field.getType(), parentColumn);
         }
 
         return null;
@@ -650,6 +631,16 @@ public class GenericDaoHelper {
         stringBuilder.appendQuotedList(columnNames).append(") VALUES (");
         stringBuilder.appendList(bindings).append(")");
         return stringBuilder.toString();
+    }
+
+    public static final String COLUMN_NAME_SEPARATOR = "_";
+
+    public static String getColumnNameFrom(String name, Column parentColumn) {
+        return parentColumn == null ? name : parentColumn.getName() + COLUMN_NAME_SEPARATOR + name;
+    }
+
+    public static String getColumnNameFrom(String name, Column parentColumn, String separator) {
+        return parentColumn == null ? name : parentColumn.getName() + separator + name;
     }
 
 }

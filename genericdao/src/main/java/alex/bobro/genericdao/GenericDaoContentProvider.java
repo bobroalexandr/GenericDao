@@ -61,7 +61,8 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
         Scheme scheme = Scheme.getSchemeInstance(table);
 
         boolean isManyToOneNestedAffected = Boolean.valueOf(UriHelper.getQueryValueFromUri(uri, IS_MANY_TO_ONE_NESTED_AFFECTED, Boolean.TRUE.toString()));
-        String joinTable = (scheme == null || !isManyToOneNestedAffected) ? table : scheme.createJoinClause(null, null, new OutValue<>(0));
+        String joinTable = (scheme == null || !isManyToOneNestedAffected) ? table : scheme.createJoinClause(null, null);
+        if(projection == null && scheme != null) projection = scheme.getProjection(null);
 
         Cursor cursor = db.query(joinTable, projection, selection, selectionArgs, null, null, sortOrder);
         if (cursor != null && getContext() != null) {

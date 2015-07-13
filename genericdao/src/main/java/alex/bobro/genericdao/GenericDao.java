@@ -397,19 +397,21 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneGotWithParent()));
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, args, groupBy, having, orderBy, limit, queryParametersBuilder.build());
 
+            long time = System.currentTimeMillis();
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
                     objects = new ArrayList<>();
                     do {
-                        DbEntity entity = GenericDaoHelper.fromCursor(cursor, entityClass);
+                        DbEntity entity = GenericDaoHelper.fromCursor(scheme, cursor, entityClass);
                         objects.add(entity);
                     } while (cursor.moveToNext());
                 }
                 cursor.close();
             }
+            Log.i("test!","fromCursor = " + (System.currentTimeMillis() - time));
         }
 
-        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
+        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
             for (DbEntity entity : objects) {
                 fillEntityWithNestedObjects(entity, requestParameters);
             }
@@ -437,12 +439,12 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, keyValues, null, null, null, null,queryParametersBuilder.build());
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
-                    entity = GenericDaoHelper.fromCursor(cursor, entityClass);
+                    entity = GenericDaoHelper.fromCursor(scheme, cursor, entityClass);
                 }
                 cursor.close();
             }
 
-            if (entity != null && !RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
+            if (entity != null && !RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
                 fillEntityWithNestedObjects(entity, requestParameters);
             }
         }
