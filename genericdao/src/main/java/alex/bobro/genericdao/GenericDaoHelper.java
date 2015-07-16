@@ -214,13 +214,13 @@ public class GenericDaoHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> DbEntity fromCursor(Cursor cursor, Class<DbEntity> dbEntityClass) {
-        return fromCursor(cursor, dbEntityClass, new OutValue<>(0));
+    public static <DbEntity> DbEntity fromCursor(Scheme scheme, Cursor cursor, Class<DbEntity> dbEntityClass) {
+        return fromCursor(scheme, cursor, dbEntityClass, new OutValue<>(0));
     }
 
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> DbEntity fromCursor(Cursor cursor, Class<DbEntity> dbEntityClass, OutValue<Integer> objectIndex) {
+    public static <DbEntity> DbEntity fromCursor(Scheme scheme, Cursor cursor, Class<DbEntity> dbEntityClass, OutValue<Integer> objectIndex) {
         if (cursor == null || objectIndex.value >= cursor.getColumnCount())
             return null;
 
@@ -237,7 +237,6 @@ public class GenericDaoHelper {
             return null;
         }
 
-        Scheme scheme = getSchemeInstanceOrThrow(objectClass);
         Reflection.Creator creator = Reflection.creator(objectClass);
         DbEntity entity = dbEntityClass.cast(creator.newInstanceFor());
         if (entity != null) fillEntityWithValues(entity, objectClass, cursor, scheme, objectIndex);
@@ -447,14 +446,15 @@ public class GenericDaoHelper {
                 break;
 
             case OBJECT:
-                valueForField = getValueFromFieldForObject(field, cursor, index, objectIndex);
+                valueForField = getValueFromFieldForObject(column, cursor, index, objectIndex);
                 break;
         }
 
         return valueForField;
     }
 
-    private static Object getValueFromFieldForObject(Field field, Cursor cursor, int index, OutValue<Integer> objectIndex) {
+    private static Object getValueFromFieldForObject(Column column, Cursor cursor, int index, OutValue<Integer> objectIndex) {
+        Field field = column.getConnectedField();
         if (List.class.isAssignableFrom(field.getType())) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
             FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
@@ -465,7 +465,7 @@ public class GenericDaoHelper {
             }
 
         } else {
-            return GenericDaoHelper.fromCursor(cursor, field.getType(), objectIndex);
+            return GenericDaoHelper.fromCursor(column.getScheme(), cursor, field.getType(), objectIndex);
         }
 
         return null;

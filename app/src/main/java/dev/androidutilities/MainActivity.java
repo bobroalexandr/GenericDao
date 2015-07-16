@@ -68,7 +68,10 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         List<TestEntity> entities = generateEnteties();
         GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
                 new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
-        Log.i("tEST!","total = " + (System.currentTimeMillis() - time));
+        Log.i("tEST!", "total = " + (System.currentTimeMillis() - time));
+        time = System.currentTimeMillis();
+        List<TestEntity> objects = GenericDao.getInstance().getObjects(TestEntity.class);
+        Log.i("tEST!", "get = " + (System.currentTimeMillis() - time));
     }
 
     private List<TestEntity> generateEnteties() {

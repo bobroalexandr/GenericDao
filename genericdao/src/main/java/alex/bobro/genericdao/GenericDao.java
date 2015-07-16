@@ -401,7 +401,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 if (cursor.moveToFirst()) {
                     objects = new ArrayList<>();
                     do {
-                        DbEntity entity = GenericDaoHelper.fromCursor(cursor, entityClass);
+                        DbEntity entity = GenericDaoHelper.fromCursor(scheme, cursor, entityClass);
                         objects.add(entity);
                     } while (cursor.moveToNext());
                 }
@@ -437,7 +437,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, keyValues, null, null, null, null,queryParametersBuilder.build());
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
-                    entity = GenericDaoHelper.fromCursor(cursor, entityClass);
+                    entity = GenericDaoHelper.fromCursor(scheme, cursor, entityClass);
                 }
                 cursor.close();
             }
