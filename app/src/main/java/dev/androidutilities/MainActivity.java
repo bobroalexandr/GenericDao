@@ -60,6 +60,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
                 .withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
         List<TestChild1> child1s = GenericDao.getInstance().getObjects(builder.build(), TestParent.class);
         GenericDao.getInstance().fillEntityWithNestedObjects(child1s.get(0), builder.build());
+
+         Log.i("Test!","test");
     }
 
     private void benchMarkSave() {

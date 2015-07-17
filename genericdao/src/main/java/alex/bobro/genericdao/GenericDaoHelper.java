@@ -18,6 +18,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import alex.bobro.genericdao.entities.Column;
 import alex.bobro.genericdao.entities.FieldType;
@@ -26,6 +27,7 @@ import alex.bobro.genericdao.util.CollectionUtils;
 import alex.bobro.genericdao.util.OutValue;
 import alex.bobro.genericdao.util.QueryBuilder;
 import alex.bobro.genericdao.util.Reflection;
+import alex.bobro.genericdao.util.TimeLogger;
 
 @SuppressWarnings({"unused"})
 public class GenericDaoHelper {
@@ -38,35 +40,15 @@ public class GenericDaoHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static Object getValueForField(@NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field) {
-        Object value;
-        Reflection.Invoker getterInvoker = Reflection.invoker(false, getGetterName(field), genericDaoClass);
-
-        if (getterInvoker != null && field.getType().equals(getterInvoker.getMethod().getReturnType())) {
-            value = getterInvoker.invokeFor(object);
-
-        } else {
-            Reflection.Accessor fieldAccessor = Reflection.accessor(field);
-            value = fieldAccessor.get(object);
-        }
-
-        return value;
+    public static Object getValueForField(@NotNull Scheme scheme, @NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field) {
+        Reflection.Accessor fieldAccessor = scheme.getAccessorsMap().get(genericDaoClass).get(field.getName());
+        return fieldAccessor.get(object);
     }
 
     @SuppressWarnings("unchecked")
-    public static void setValueForField(@NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field, Object value) {
-        if (!field.getDeclaringClass().isAssignableFrom(object.getClass())) {
-            field = Scheme.getFieldByNameFrom(object.getClass(), field.getName());
-        }
-        Reflection.Invoker setterInvoker = Reflection.invoker(false, getSetterName(field), genericDaoClass, field.getType());
-
-        if (setterInvoker != null) {
-            setterInvoker.invokeFor(object, value);
-
-        } else {
-            Reflection.Accessor fieldAccessor = Reflection.accessor(field);
-            fieldAccessor.set(object, value);
-        }
+    public static void setValueForField(@NotNull Scheme scheme, @NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field, Object value) {
+        Reflection.Accessor fieldAccessor = scheme.getAccessorsMap().get(genericDaoClass).get(field.getName());
+        fieldAccessor.set(object, value);
     }
 
 
@@ -161,7 +143,7 @@ public class GenericDaoHelper {
     }
 
     public static String toKeyValue(Scheme scheme, Object value) {
-        if(TextUtils.isEmpty(scheme.getKeyField())) return null;
+        if (TextUtils.isEmpty(scheme.getKeyField())) return null;
 
 
         String[] keyFields = new String[]{scheme.getKeyField()};
@@ -172,7 +154,7 @@ public class GenericDaoHelper {
             if (i != 0) {
                 builder.append(SEPARATOR);
             }
-            builder.append(getValueForField(value.getClass(), value, scheme.getAnnotatedFields().get(keyField).getConnectedField()));
+            builder.append(getValueForField(scheme, value.getClass(), value, scheme.getAnnotatedFields().get(keyField).getConnectedField()));
         }
 
         return builder.toString();
@@ -224,23 +206,20 @@ public class GenericDaoHelper {
         if (cursor == null || objectIndex.value >= cursor.getColumnCount())
             return null;
 
-        List<String> columns = Arrays.asList(cursor.getColumnNames());
-
+//        TimeLogger.startLogging(GenericDaoHelper.class, TimeUnit.NANOSECONDS);
         String className = cursor.getString(objectIndex.value);
         if (TextUtils.isEmpty(className))
             return null;
 
-        Class objectClass;
-        try {
-            objectClass = Class.forName(className);
-        } catch (ClassNotFoundException e) {
-            return null;
-        }
-
-        Reflection.Creator creator = Reflection.creator(objectClass);
-        DbEntity entity = dbEntityClass.cast(creator.newInstanceFor());
-        if (entity != null) fillEntityWithValues(entity, objectClass, cursor, scheme, objectIndex);
-
+//        TimeLogger.logTime(GenericDaoHelper.class, "step 1");
+        Reflection.Creator creator = scheme.getCreatorMap().get(className);
+        Object object = creator.newInstanceFor();
+        DbEntity entity = dbEntityClass.cast(object);
+//        TimeLogger.logTime(GenericDaoHelper.class, "step 2");
+        if (entity != null)
+            fillEntityWithValues(entity, creator.getConstructor().getDeclaringClass(), cursor, scheme, objectIndex);
+//        TimeLogger.logTime(GenericDaoHelper.class, "step 3");
+//        TimeLogger.stopLogging(GenericDaoHelper.class);
         return entity;
     }
 
@@ -254,16 +233,17 @@ public class GenericDaoHelper {
         objectIndex.value = objectFinishIndex;
 
         for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
-            if(i >= columns.size()) return;
+//            TimeLogger.startLogging(TimeLogger.class, TimeUnit.NANOSECONDS);
+            if (i >= columns.size()) return;
             Column column = scheme.getAnnotatedFields().get(columns.get(i));
             if (column == null) continue;
-            if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), column.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
+            if (scheme.getAccessorsMap().get(objectClass).get(column.getConnectedField().getName()) == null) {
                 continue;
             }
 
             if (cursor.isNull(i)) {
                 if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-                    Scheme manyToOneScheme = getSchemeInstanceOrThrow(column.getConnectedField().getType());
+                    Scheme manyToOneScheme = column.getScheme();
                     for (int k = 0; k < manyToOneScheme.getManyToOneFields().size() + 1; k++) {
                         objectIndex.value = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
                     }
@@ -274,8 +254,12 @@ public class GenericDaoHelper {
             if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType()))
                 continue;
 
+//            TimeLogger.logTime(TimeLogger.class, "peref");
             Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? objectIndex : new OutValue<>(i));
-            GenericDaoHelper.setValueForField(objectClass, entity, column.getConnectedField(), valueForField);
+//            TimeLogger.logTime(TimeLogger.class, "get");
+            GenericDaoHelper.setValueForField(scheme, objectClass, entity, column.getConnectedField(), valueForField);
+//            TimeLogger.logTime(TimeLogger.class, "set");
+//            TimeLogger.stopLogging(TimeLogger.class);
         }
     }
 
@@ -309,11 +293,11 @@ public class GenericDaoHelper {
             field = Scheme.getFieldByNameFrom(object.getClass(), field.getName());
         }
 
-        Object fieldValue = GenericDaoHelper.getValueForField(object.getClass(), object, field);
+        Object fieldValue = GenericDaoHelper.getValueForField(scheme, object.getClass(), object, field);
         if (fieldValue == null)
             return contentProviderOperationList;
 
-        FieldType fieldType = FieldType.findByTypeClass(field.getType());
+        FieldType fieldType = FieldType.getTypeByClass(field.getType());
         if (fieldType == null)
             return contentProviderOperationList;
 
@@ -361,7 +345,7 @@ public class GenericDaoHelper {
                 break;
 
             case DATE:
-                cv.put(name, ((Date)fieldValue).getTime());
+                cv.put(name, ((Date) fieldValue).getTime());
                 break;
 
             case OBJECT:
@@ -377,11 +361,12 @@ public class GenericDaoHelper {
                                         List<GenericContentProviderOperation> contentProviderOperationList) {
         if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
             Scheme fieldScheme = Scheme.getSchemeInstance(fieldValue.getClass());
-            if(requestParameters.isManyToOneGotWithParent()) contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
+            if (requestParameters.isManyToOneGotWithParent())
+                contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
             cv.put(column.getName(), GenericDaoHelper.toKeyValue(column.getParentScheme(), fieldValue));
         } else if (fieldValue instanceof List) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
-            FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
+            FieldType type = FieldType.getTypeByClass((Class<?>) listType.getActualTypeArguments()[0]);
 
             switch (type) {
                 case STRING:
@@ -396,7 +381,7 @@ public class GenericDaoHelper {
 
     public static Object getValueForFieldFromCursor(Column column, Cursor cursor, OutValue<Integer> objectIndex) {
         Field field = column.getConnectedField();
-        FieldType fieldType = FieldType.findByTypeClass(field.getType());
+        FieldType fieldType = FieldType.getTypeByClass(field.getType());
 
         Object valueForField = null;
         int index = objectIndex.value;
@@ -457,7 +442,7 @@ public class GenericDaoHelper {
         Field field = column.getConnectedField();
         if (List.class.isAssignableFrom(field.getType())) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
-            FieldType type = FieldType.findByTypeClass((Class<?>) listType.getActualTypeArguments()[0]);
+            FieldType type = FieldType.getTypeByClass((Class<?>) listType.getActualTypeArguments()[0]);
 
             switch (type) {
                 case STRING:
@@ -478,7 +463,8 @@ public class GenericDaoHelper {
         ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>();
 
         Object keyValue = GenericDaoHelper.toKeyValue(scheme, dbEntity);
-        if (keyValue == null && scheme.hasNestedObjects()) throw new Error("Key value can't be null for object with connections");
+        if (keyValue == null && scheme.hasNestedObjects())
+            throw new Error("Key value can't be null for object with connections");
 
         if (!RequestParameters.RequestMode.JUST_NESTED.equals(requestParameters.getRequestMode())) {
             GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
@@ -502,7 +488,7 @@ public class GenericDaoHelper {
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
-            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, oneToManyColumn.getConnectedField());
+            Object value = GenericDaoHelper.getValueForField(scheme, objectClass, dbEntity, oneToManyColumn.getConnectedField());
 
             if (value == null)
                 continue;
@@ -528,7 +514,7 @@ public class GenericDaoHelper {
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), oneToManyColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
-            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, oneToManyColumn.getConnectedField());
+            Object value = GenericDaoHelper.getValueForField(scheme, objectClass, dbEntity, oneToManyColumn.getConnectedField());
 
             if (value == null)
                 continue;
@@ -545,7 +531,7 @@ public class GenericDaoHelper {
             if (!CollectionUtils.contains(scheme.getAllFields().get(objectClass), manyToManyColumn.getConnectedField(), Scheme.FIELD_NAME_COMPARATOR)) {
                 continue;
             }
-            Object value = GenericDaoHelper.getValueForField(objectClass, dbEntity, manyToManyColumn.getConnectedField());
+            Object value = GenericDaoHelper.getValueForField(scheme, objectClass, dbEntity, manyToManyColumn.getConnectedField());
 
             if (value == null)
                 continue;
@@ -554,7 +540,7 @@ public class GenericDaoHelper {
             List list = (List) value;
             for (Object object : list) {
                 //noinspection unchecked
-                contentProviderOperations.addAll(getContentProviderOperationBatch(manyToManyScheme,object, null, null, nestedParameters));
+                contentProviderOperations.addAll(getContentProviderOperationBatch(manyToManyScheme, object, null, null, nestedParameters));
 
                 ContentValues manyToManyCV = new ContentValues();
                 manyToManyCV.put(GenericDaoHelper.getColumnNameFromTable(scheme.getName()), keyValue);
@@ -583,7 +569,8 @@ public class GenericDaoHelper {
         if (TextUtils.isEmpty(keyValue))
             return contentProviderOperations;
 
-        if(!requestParameters.isManyToOneGotWithParent()) fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
+        if (!requestParameters.isManyToOneGotWithParent())
+            fillBatchWithManyToOneFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithOneToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
         fillBatchWithManyToManyFields(dbEntity, scheme, objectClass, keyValue, nestedParameters, contentProviderOperations);
 

@@ -24,11 +24,13 @@ import java.util.WeakHashMap;
 import alex.bobro.genericdao.annotation.FieldAnnotation;
 import alex.bobro.genericdao.annotation.TableAnnotation;
 import alex.bobro.genericdao.entities.Column;
+import alex.bobro.genericdao.entities.FieldType;
 import alex.bobro.genericdao.entities.ForeignKeyActions;
 import alex.bobro.genericdao.entities.RelationType;
 import alex.bobro.genericdao.entities.SQLiteType;
 import alex.bobro.genericdao.util.CollectionUtils;
 import alex.bobro.genericdao.util.OutValue;
+import alex.bobro.genericdao.util.Reflection;
 
 public class Scheme {
 
@@ -95,6 +97,10 @@ public class Scheme {
 
     private Set<Scheme> foreignSchemes;
 
+    private Map<String, Reflection.Creator> creatorMap;
+    private Map<Class, HashMap<String,Reflection.Accessor>> accessorsMap;
+    private Map<Class, FieldType> fieldTypeMap;
+
     private Scheme(Class<?> modelClass) throws ClassCastException, IllegalArgumentException {
         modelClasses = new HashSet<>();
         TableAnnotation table = modelClass.getAnnotation(TableAnnotation.class);
@@ -110,6 +116,10 @@ public class Scheme {
 
         annotatedFields = new LinkedHashMap<>();
         allFields = new HashMap<>();
+
+        creatorMap = new HashMap<>();
+        accessorsMap = new HashMap<>();
+        fieldTypeMap = new HashMap<>();
 
         autoincrement = table.autoincrement();
         keyField = table.keyField();
@@ -206,21 +216,31 @@ public class Scheme {
 
     private void addClass(Class clazz) {
         modelClasses.add(clazz);
+        creatorMap.put(clazz.getName(), Reflection.creator(clazz));
+        fieldTypeMap.put(clazz, FieldType.findByTypeClass(clazz));
+    }
+
+    public FieldType findByTypeClass(Class clazz) {
+        return fieldTypeMap.get(clazz);
     }
 
     private void addAllFieldsFrom(Class<?> genericDaoClass) {
+        HashMap<String, Reflection.Accessor> accessorHashMap = new HashMap<>();
         List<Field> classFields = new ArrayList<>();
         Class current = genericDaoClass;
         while (!current.equals(Object.class)) {
             Field[] fields = current.getDeclaredFields();
             for (Field field : fields) {
-                if(field.isAnnotationPresent(FieldAnnotation.class))
+                if(field.isAnnotationPresent(FieldAnnotation.class)) {
                     classFields.add(field);
+                    accessorHashMap.put(field.getName(), Reflection.accessor(field));
+                }
             }
             current = current.getSuperclass();
         }
 
         allFields.put(genericDaoClass, classFields);
+        accessorsMap.put(genericDaoClass, accessorHashMap);
     }
 
     public static Field getFieldByNameFrom(Class<?> genericDaoClass, String name) {
@@ -422,6 +442,14 @@ public class Scheme {
             uris.add(manyToOneClassScheme.getUri(context));
         }
         return uris;
+    }
+
+    public Map<String, Reflection.Creator> getCreatorMap() {
+        return creatorMap;
+    }
+
+    public Map<Class, HashMap<String, Reflection.Accessor>> getAccessorsMap() {
+        return accessorsMap;
     }
 
     @Override
