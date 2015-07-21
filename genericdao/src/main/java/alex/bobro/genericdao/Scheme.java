@@ -408,9 +408,9 @@ public class Scheme {
 
     public List<String> getColumnsListFromScheme(Column parentColumn) {
         List<String> columns = new ArrayList<>();
-        columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, ".")/* + " AS " + GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn)*/);
+        columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this, ".") + " AS " + GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this));
         for (Column column : getAnnotatedFields().values()) {
-            columns.add(GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, ".")/* + " AS " + GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn)*/);
+            columns.add(GenericDaoHelper.getColumnNameFrom(column.getName(),  parentColumn, this, ".") + " AS " + GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, this));
         }
 
         return columns;

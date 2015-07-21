@@ -224,7 +224,7 @@ public class GenericDaoHelper {
         if (cursor == null)
             return null;
 
-        String className = cursor.getString(cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(Scheme.COLUMN_OBJECT_CLASS_NAME, parentColumn)));
+        String className = cursor.getString(cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(Scheme.COLUMN_OBJECT_CLASS_NAME, parentColumn, scheme)));
         if (TextUtils.isEmpty(className))
             return null;
 
@@ -247,7 +247,7 @@ public class GenericDaoHelper {
                 continue;
             }
 
-            int index = cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn));
+            int index = cursor.getColumnIndex(GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, scheme));
             if (cursor.isNull(index)) {
                 continue;
             }
@@ -635,12 +635,16 @@ public class GenericDaoHelper {
 
     public static final String COLUMN_NAME_SEPARATOR = "_";
 
-    public static String getColumnNameFrom(String name, Column parentColumn) {
-        return parentColumn == null ? name : parentColumn.getName() + COLUMN_NAME_SEPARATOR + name;
+    public static String getColumnNameFrom(String name, Column parentColumn, Scheme scheme) {
+        return getColumnNameFrom(name, parentColumn, scheme, COLUMN_NAME_SEPARATOR);
     }
 
-    public static String getColumnNameFrom(String name, Column parentColumn, String separator) {
-        return parentColumn == null ? name : parentColumn.getName() + separator + name;
+    public static String getColumnNameFrom(String name, Column parentColumn, Scheme scheme, String separator) {
+        return getColumnNameFrom(name, parentColumn == null ? scheme.getName() : parentColumn.getName(), separator);
+    }
+
+    public static String getColumnNameFrom(String name, String tableName, String separator) {
+        return tableName + separator + name;
     }
 
 }
