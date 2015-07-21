@@ -363,7 +363,7 @@ public class GenericDaoHelper {
             Scheme fieldScheme = Scheme.getSchemeInstance(fieldValue.getClass());
             if (requestParameters.isManyToOneGotWithParent())
                 contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
-            cv.put(column.getName(), GenericDaoHelper.toKeyValue(column.getParentScheme(), fieldValue));
+            cv.put(column.getName(), GenericDaoHelper.toKeyValue(column.getScheme(), fieldValue));
         } else if (fieldValue instanceof List) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
             FieldType type = FieldType.getTypeByClass((Class<?>) listType.getActualTypeArguments()[0]);

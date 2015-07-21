@@ -409,7 +409,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             }
         }
 
-        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
+        if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
             for (DbEntity entity : objects) {
                 fillEntityWithNestedObjects(entity, requestParameters);
             }
@@ -442,7 +442,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 cursor.close();
             }
 
-            if (entity != null && !RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode())) {
+            if (entity != null && !RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
                 fillEntityWithNestedObjects(entity, requestParameters);
             }
         }
