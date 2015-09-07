@@ -1,6 +1,7 @@
 package dev.androidutilities;
 
 import android.app.ActionBar;
+import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,6 +28,7 @@ import alex.bobro.genericdao.util.Reflection;
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
 import dev.androidutilities.model.TestEntity;
+import dev.androidutilities.model.TestEntityNested;
 import dev.androidutilities.model.TestParent;
 
 
@@ -66,10 +68,17 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
 
     private void benchMarkSave() {
         GenericDao.getInstance().delete(TestEntity.class);
-        long time = System.currentTimeMillis();
+        GenericDao.getInstance().delete(TestEntityNested.class);
         List<TestEntity> entities = generateEnteties();
+        long time = System.currentTimeMillis();
+//        List<TestEntityNested> entitiesNest = new ArrayList<>();
+//        for (TestEntity entity : entities) {
+//            entitiesNest.add(entity.nested);
+//        }
+//        GenericDao.getInstance().saveCollection(entitiesNest, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
+//                new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
         GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
-                new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
+                null);
         Log.i("tEST!", "save = " + (System.currentTimeMillis() - time));
         time = System.currentTimeMillis();
         List<TestEntity> objects = GenericDao.getInstance().getObjects(TestEntity.class);
@@ -79,7 +88,9 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
     private List<TestEntity> generateEnteties() {
         List<TestEntity> entities = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
-            entities.add(new TestEntity(Utils.getRandomString(100), Utils.getRandomString(100), Utils.getRandomInt(100), Utils.getRandomLong()));
+            TestEntityNested nested = new TestEntityNested(Utils.getRandomString(100), Utils.getRandomInt(100));
+            entities.add(new TestEntity(Utils.getRandomString(100), Utils.getRandomString(100), Utils.getRandomInt(100),
+                    Utils.getRandomLong(), nested));
         }
         return entities;
     }

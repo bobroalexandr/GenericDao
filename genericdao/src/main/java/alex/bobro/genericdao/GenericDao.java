@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import alex.bobro.genericdao.entities.Column;
 import alex.bobro.genericdao.util.CollectionUtils;
+import alex.bobro.genericdao.util.TimeLogger;
 
 @SuppressWarnings("unused")
 public final class GenericDao<DbHelper extends GenericContentProvider> {
@@ -106,6 +107,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         boolean isAfterAll = RequestParameters.NotificationMode.AFTER_ALL.equals(notificationMode);
         try {
             ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>(entities.size());
+            TimeLogger.startLogging(this, TimeUnit.NANOSECONDS);
             Scheme scheme = null;
             for (DbEntity entity : entities) {
                 if (scheme == null)
@@ -120,7 +122,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                     dbHelper.notifyChange(scheme, keyValue);
                 }
             }
-
+            TimeLogger.logTime(this, "generate operations");
             if (RequestParameters.NotificationMode.AFTER_ALL.equals(requestParameters.getNotificationMode())) {
                 bulkInsertGenericOperations(contentProviderOperations, insertParams);
                 dbHelper.notifyChange(scheme);
@@ -135,25 +137,26 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     }
 
     private void bulkInsertGenericOperations(ArrayList<GenericContentProviderOperation> contentProviderOperations, QueryParameters queryParameters) {
-        Map<String, Pair<QueryParameters,List<ContentValues>>> map = groupContentProviderBatches(contentProviderOperations);
+        Map<String, List<ContentValues>> map = groupContentProviderBatches(contentProviderOperations);
+        TimeLogger.logTime(this, "generate map");
         for (String key : map.keySet()) {
-            Pair<QueryParameters,List<ContentValues>> pair = map.get(key);
-            dbHelper.bulkInsert(key, pair.second.toArray(new ContentValues[pair.second.size()]), pair.first);
+            List<ContentValues> list = map.get(key);
+            dbHelper.bulkInsert(key, list.toArray(new ContentValues[list.size()]), queryParameters);
+            TimeLogger.logTime(this, "insert key " + key);
         }
     }
 
-    private Map<String, Pair<QueryParameters,List<ContentValues>>> groupContentProviderBatches(List<GenericContentProviderOperation> operations) {
-        Map<String, Pair<QueryParameters,List<ContentValues>>> map = new LinkedHashMap<>();
+    private Map<String, List<ContentValues>> groupContentProviderBatches(List<GenericContentProviderOperation> operations) {
+        Map<String, List<ContentValues>> map = new LinkedHashMap<>();
         for (GenericContentProviderOperation operation : operations) {
             String table = operation.getTable();
-            Pair<QueryParameters,List<ContentValues>> pair = map.get(table);
-            if(pair == null) {
-                List<ContentValues> list = new ArrayList<>();
-                pair = new Pair<>(operation.getQueryParameters(), list);
-                map.put(table, pair);
+            List<ContentValues> list = map.get(table);
+            if(list == null) {
+                list = new ArrayList<>();
+                map.put(table, list);
             }
 
-            pair.second.add(operation.getContentValues());
+            list.add(operation.getContentValues());
         }
         return map;
     }
@@ -178,6 +181,10 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 save(dbEntity, contentValues, insertParams, requestParameters);
             }
         }).start();
+    }
+
+    public <DbEntity> long save(DbEntity dbEntity, QueryParameters insertParams, RequestParameters requestParameters) {
+        return save(dbEntity, null, insertParams, requestParameters);
     }
 
     /**

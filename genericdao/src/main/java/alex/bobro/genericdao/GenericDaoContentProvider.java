@@ -162,9 +162,18 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
         db.beginTransaction();
         for (ContentValues value : values) {
-            String keyValue;
-            if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm) && isExists(db, table, keyField, keyValue = value.getAsString(keyField))) {
-                db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
+//            if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm) && isExists(db, table, keyField, keyValue = value.getAsString(keyField))) {
+//                db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
+//            } else {
+//                int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
+//                db.insertWithOnConflict(table, null, value, algorithm);
+//            }
+            if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm)) {
+                String keyValue = value.getAsString(keyField);
+                int updated = db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
+                if(updated == 0) {
+                    db.insertWithOnConflict(table, null, value, SQLiteDatabase.CONFLICT_NONE);
+                }
             } else {
                 int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
                 db.insertWithOnConflict(table, null, value, algorithm);

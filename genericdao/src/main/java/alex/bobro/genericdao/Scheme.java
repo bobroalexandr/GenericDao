@@ -29,7 +29,6 @@ import alex.bobro.genericdao.entities.ForeignKeyActions;
 import alex.bobro.genericdao.entities.RelationType;
 import alex.bobro.genericdao.entities.SQLiteType;
 import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
 import alex.bobro.genericdao.util.Reflection;
 
 public class Scheme {

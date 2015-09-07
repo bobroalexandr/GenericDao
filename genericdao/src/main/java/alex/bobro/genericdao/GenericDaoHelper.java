@@ -381,10 +381,10 @@ public class GenericDaoHelper {
     private static void putObjectIntoCv(Column column, ContentValues cv, Object fieldValue, RequestParameters requestParameters, Field field, String name,
                                         List<GenericContentProviderOperation> contentProviderOperationList) {
         if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-            Scheme fieldScheme = Scheme.getSchemeInstance(fieldValue.getClass());
+            Scheme fieldScheme = column.getScheme();
             if (requestParameters.isManyToOneGotWithParent())
                 contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
-            cv.put(column.getName(), GenericDaoHelper.toKeyValue(column.getScheme(), fieldValue));
+            cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldScheme, fieldValue));
         } else if (fieldValue instanceof List) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
             FieldType type = FieldType.getTypeByClass((Class<?>) listType.getActualTypeArguments()[0]);

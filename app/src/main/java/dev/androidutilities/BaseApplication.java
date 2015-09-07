@@ -14,6 +14,7 @@ import alex.bobro.genericdao.Scheme;
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
 import dev.androidutilities.model.TestEntity;
+import dev.androidutilities.model.TestEntityNested;
 
 /**
  * Android Main Application
@@ -31,7 +32,7 @@ public class BaseApplication extends Application {
         super.onCreate();
         instance = this;
         Log.i("test!", "BaseApplication");
-        Scheme.init(TestChild1.class, TestChild2.class, TestEntity.class);
+        Scheme.init(TestChild1.class, TestChild2.class, TestEntity.class, TestEntityNested.class);
         ContextContentProvider testContentProvider = new ContextContentProvider(this);
         GenericDao.init(testContentProvider);
     }
