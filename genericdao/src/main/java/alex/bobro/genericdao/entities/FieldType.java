@@ -2,6 +2,8 @@ package alex.bobro.genericdao.entities;
 
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 public enum FieldType {
     INTEGER(SQLiteType.INTEGER, Integer.class, int.class),
@@ -31,6 +33,21 @@ public enum FieldType {
 
     public SQLiteType getSqliteType() {
         return sqliteType;
+    }
+
+    private static Map<Class, FieldType> fieldTypeMap = new HashMap<>();
+
+    static {
+        for (FieldType b : FieldType.values()) {
+            for (Class clazz : b.cls) {
+                fieldTypeMap.put(clazz, b);
+            }
+        }
+    }
+
+    public static FieldType getTypeByClass(Class cls) {
+        FieldType fieldType = fieldTypeMap.get(cls);
+        return fieldType == null ? OBJECT : fieldType;
     }
 
     public static FieldType findByTypeClass(Class cls) {

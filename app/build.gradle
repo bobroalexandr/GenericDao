@@ -57,10 +57,6 @@ unMock {
 }
 
 dependencies {
-    apt 'com.raizlabs.android:DBFlow-Compiler:2.1.0'
-    compile "com.raizlabs.android:DBFlow-Core:2.1.0"
-    compile "com.raizlabs.android:DBFlow:2.1.0"
-
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.android.support:appcompat-v7:21.0.3'
     compile 'org.glassfish:javax.annotation:10.0-b28'

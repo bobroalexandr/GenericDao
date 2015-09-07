@@ -60,6 +60,8 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
                 .withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
         List<TestChild1> child1s = GenericDao.getInstance().getObjects(builder.build(), TestParent.class);
         GenericDao.getInstance().fillEntityWithNestedObjects(child1s.get(0), builder.build());
+
+         Log.i("Test!", "test");
     }
 
     private void benchMarkSave() {
@@ -68,15 +70,15 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         List<TestEntity> entities = generateEnteties();
         GenericDao.getInstance().saveCollection(entities, new RequestParameters.Builder().withNotificationMode(RequestParameters.NotificationMode.AFTER_ALL).build(),
                 new QueryParameters.Builder().addParameter(GenericDaoContentProvider.CONFLICT_ALGORITHM, String.valueOf(SQLiteDatabase.CONFLICT_REPLACE)).build());
-        Log.i("tEST!", "total = " + (System.currentTimeMillis() - time));
+        Log.i("tEST!", "save = " + (System.currentTimeMillis() - time));
         time = System.currentTimeMillis();
-        GenericDao.getInstance().getObjects(TestEntity.class);
+        List<TestEntity> objects = GenericDao.getInstance().getObjects(TestEntity.class);
         Log.i("tEST!", "total get = " + (System.currentTimeMillis() - time));
     }
 
     private List<TestEntity> generateEnteties() {
         List<TestEntity> entities = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 1000; i++) {
             entities.add(new TestEntity(Utils.getRandomString(100), Utils.getRandomString(100), Utils.getRandomInt(100), Utils.getRandomLong()));
         }
         return entities;

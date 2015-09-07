@@ -270,7 +270,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
 
         if (scheme.getKeyField() != null) {
             String where = GenericDaoHelper.arrayToWhereString(scheme.getKeyFieldFullName());
-            Object fieldValue = GenericDaoHelper.getValueForField(objectClass, dbEntity, scheme.getAnnotatedFields().get(scheme.getKeyField()).getConnectedField());
+            Object fieldValue = GenericDaoHelper.getValueForField(scheme, objectClass, dbEntity, scheme.getAnnotatedFields().get(scheme.getKeyField()).getConnectedField());
             String[] values = new String[]{String.valueOf(fieldValue)};
 
             int result = dbHelper.delete(scheme.getName(), where, values);
@@ -296,7 +296,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             List<String> fieldValues = new ArrayList<>();
 
             for (DbEntity entity : dbEntities) {
-                Object fieldValue = GenericDaoHelper.getValueForField(objectClass, entity, scheme.getAnnotatedFields().get(scheme.getKeyField()).getConnectedField());
+                Object fieldValue = GenericDaoHelper.getValueForField(scheme, objectClass, entity, scheme.getAnnotatedFields().get(scheme.getKeyField()).getConnectedField());
                 fieldValues.add(fieldValue.toString());
             }
 
@@ -493,7 +493,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 Object object = GenericDao.getInstance().getObjectById(requestParameters, manyToOneColumn.getConnectedField().getType(), key);
 
                 //noinspection unchecked
-                GenericDaoHelper.setValueForField(objectClass, entity, manyToOneColumn.getConnectedField(), object);
+                GenericDaoHelper.setValueForField(scheme, objectClass, entity, manyToOneColumn.getConnectedField(), object);
             }
         }
     }
@@ -522,7 +522,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 } while (relationsCursor.moveToNext());
                 relationsCursor.close();
 
-                GenericDaoHelper.setValueForField(objectClass, entity, manyToManyColumn.getConnectedField(), valuesList);
+                GenericDaoHelper.setValueForField(scheme, objectClass, entity, manyToManyColumn.getConnectedField(), valuesList);
             }
         }
     }
@@ -537,7 +537,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             List objectsCollection = GenericDao.getInstance().getObjects(requestParameters, Scheme.getToManyClass(oneToManyColumn), oneToManyScheme.getName() + "." + columnName + "=?", keyValue);
 
             //noinspection unchecked
-            GenericDaoHelper.setValueForField(objectClass, entity, oneToManyColumn.getConnectedField(), new ArrayList<>(objectsCollection));
+            GenericDaoHelper.setValueForField(scheme, objectClass, entity, oneToManyColumn.getConnectedField(), new ArrayList<>(objectsCollection));
         }
     }
 
