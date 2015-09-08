@@ -4,9 +4,9 @@ package alex.bobro.genericdao;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
 
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -37,14 +37,14 @@ public class Scheme {
     public static final String COLUMN_OBJECT_CLASS_NAME = "object_class_name";
 
     public static final Column COLUMN_OBJECT_CLASS = new Column(COLUMN_OBJECT_CLASS_NAME, SQLiteType.TEXT, null, RelationType.NONE, ForeignKeyActions.CASCADE);
-//    public static final Column _ID = new Column(COLUMN_ID_NAME, SQLiteType.INTEGER, "PRIMARY KEY AUTOINCREMENT");
+    public static final Column COLUMN_ID = new Column(COLUMN_ID_NAME, SQLiteType.INTEGER, null, RelationType.NONE, ForeignKeyActions.CASCADE);
 
     private static class SchemeInstancesHolder {
         public static final Map<String, Scheme> INSTANCES
                 = Collections.synchronizedMap(new WeakHashMap<String, Scheme>());
     }
 
-    public static synchronized Scheme getSchemeInstance(@NotNull Class<?> genericDaoClass) {
+    public static synchronized Scheme getSchemeInstance(@NonNull Class<?> genericDaoClass) {
         if (genericDaoClass.isAnnotationPresent(TableAnnotation.class)) {
             TableAnnotation annotation = genericDaoClass.getAnnotation(TableAnnotation.class);
             return getSchemeInstance(annotation.tableName());
@@ -53,7 +53,7 @@ public class Scheme {
         return null;
     }
 
-    public static synchronized Scheme getSchemeInstance(@NotNull String tableName) {
+    public static synchronized Scheme getSchemeInstance(@NonNull String tableName) {
         return SchemeInstancesHolder.INSTANCES.get(tableName);
     }
 
@@ -279,6 +279,7 @@ public class Scheme {
         String tableName = getName();
         Map<String, Column> columns = new LinkedHashMap<>();
         columns.put(COLUMN_OBJECT_CLASS_NAME, COLUMN_OBJECT_CLASS);
+        if(!annotatedFields.containsKey(COLUMN_ID_NAME)) columns.put(COLUMN_ID_NAME, COLUMN_ID);
         columns.putAll(annotatedFields);
 
         if (!GenericDaoHelper.isTableExists(database, tableName)) {
@@ -427,9 +428,15 @@ public class Scheme {
 
     public List<String> getColumnsListFromScheme(Column parentColumn) {
         List<String> columns = new ArrayList<>();
-        columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this, ".") + " AS " + GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this));
+        columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this, ".") + " AS "
+                + GenericDaoHelper.getColumnNameFrom(COLUMN_OBJECT_CLASS_NAME, parentColumn, this));
+        if(!getAnnotatedFields().containsKey(COLUMN_ID_NAME) && parentColumn == null) columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_ID_NAME, parentColumn, this, ".")
+                + " AS " + COLUMN_ID_NAME);
         for (Column column : getAnnotatedFields().values()) {
-            columns.add(GenericDaoHelper.getColumnNameFrom(column.getName(),  parentColumn, this, ".") + " AS " + GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, this));
+            columns.add(GenericDaoHelper.getColumnNameFrom(column.getName(),  parentColumn, this, ".") + " AS "
+                    + GenericDaoHelper.getColumnNameFrom(column.getName(), parentColumn, this));
+            if(COLUMN_ID_NAME.equals(column.getName()) && parentColumn == null) columns.add(GenericDaoHelper.getColumnNameFrom(COLUMN_ID_NAME, parentColumn, this, ".")
+                    + " AS " + COLUMN_ID_NAME);
         }
 
         return columns;

@@ -3,13 +3,15 @@ package alex.bobro.genericdao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.json.JSONObject;
 
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,19 +41,19 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
     private DbHelper dbHelper;
     private Executor executor;
 
-    private GenericDao(@NotNull DbHelper dbHelper, @NotNull Executor executor) {
+    private GenericDao(@NonNull DbHelper dbHelper, @NonNull Executor executor) {
         this.dbHelper = dbHelper;
         this.executor = executor;
     }
 
     private static GenericDao instance;
 
-    public synchronized static void init(@NotNull GenericContentProvider helper) {
+    public synchronized static void init(@NonNull GenericContentProvider helper) {
         instance = new GenericDao<>(helper, new ThreadPoolExecutor(
                 NUMBER_OF_CORES, NUMBER_OF_CORES * 2, THREAD_TIMEOUT_DURATION, THREAD_TIMEOUT_UNIT, new LinkedBlockingQueue<Runnable>()));
     }
 
-    public synchronized static void init(@NotNull GenericContentProvider helper, @NotNull Executor executor) {
+    public synchronized static void init(@NonNull GenericContentProvider helper, @NonNull Executor executor) {
         instance = new GenericDao<>(helper, executor);
     }
 
@@ -107,7 +109,6 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         boolean isAfterAll = RequestParameters.NotificationMode.AFTER_ALL.equals(notificationMode);
         try {
             ArrayList<GenericContentProviderOperation> contentProviderOperations = new ArrayList<>(entities.size());
-            TimeLogger.startLogging(this, TimeUnit.NANOSECONDS);
             Scheme scheme = null;
             for (DbEntity entity : entities) {
                 if (scheme == null)
@@ -117,14 +118,13 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 if (isAfterAll) {
                     contentProviderOperations.addAll(operations);
                 } else {
-                    bulkInsertGenericOperations(operations, insertParams);
+                    bulkInsertGenericOperations(operations);
                     Object keyValue = GenericDaoHelper.toKeyValue(scheme, entity);
                     dbHelper.notifyChange(scheme, keyValue);
                 }
             }
-            TimeLogger.logTime(this, "generate operations");
             if (RequestParameters.NotificationMode.AFTER_ALL.equals(requestParameters.getNotificationMode())) {
-                bulkInsertGenericOperations(contentProviderOperations, insertParams);
+                bulkInsertGenericOperations(contentProviderOperations);
                 dbHelper.notifyChange(scheme);
             }
             return true;
@@ -136,27 +136,34 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return false;
     }
 
-    private void bulkInsertGenericOperations(ArrayList<GenericContentProviderOperation> contentProviderOperations, QueryParameters queryParameters) {
-        Map<String, List<ContentValues>> map = groupContentProviderBatches(contentProviderOperations);
-        TimeLogger.logTime(this, "generate map");
+    private void bulkInsertGenericOperations(ArrayList<GenericContentProviderOperation> contentProviderOperations) {
+        Map<String, Pair<QueryParameters,List<ContentValues>>> map = groupContentProviderBatches(contentProviderOperations);
+        List<ContentValues> valuesList = new ArrayList<>();
+        List<QueryParameters> queryParameters = new ArrayList<>();
         for (String key : map.keySet()) {
-            List<ContentValues> list = map.get(key);
-            dbHelper.bulkInsert(key, list.toArray(new ContentValues[list.size()]), queryParameters);
-            TimeLogger.logTime(this, "insert key " + key);
+            Pair<QueryParameters,List<ContentValues>> pair = map.get(key);
+            QueryParameters.Builder builder = pair.first == null ? new QueryParameters.Builder() : new QueryParameters.Builder(pair.first.getParameters());
+            builder.addParameter(GenericDaoContentProvider.TABLE, key);
+            builder.addParameter(GenericDaoContentProvider.START, String.valueOf(valuesList.size()));
+            valuesList.addAll(pair.second);
+            builder.addParameter(GenericDaoContentProvider.END, String.valueOf(valuesList.size()));
+            queryParameters.add(builder.build());
         }
+        dbHelper.bulkInsert(valuesList.toArray(new ContentValues[valuesList.size()]), queryParameters);
     }
 
-    private Map<String, List<ContentValues>> groupContentProviderBatches(List<GenericContentProviderOperation> operations) {
-        Map<String, List<ContentValues>> map = new LinkedHashMap<>();
+    private Map<String, Pair<QueryParameters,List<ContentValues>>> groupContentProviderBatches(List<GenericContentProviderOperation> operations) {
+        Map<String, Pair<QueryParameters,List<ContentValues>>> map = new LinkedHashMap<>();
         for (GenericContentProviderOperation operation : operations) {
             String table = operation.getTable();
-            List<ContentValues> list = map.get(table);
-            if(list == null) {
-                list = new ArrayList<>();
-                map.put(table, list);
+            Pair<QueryParameters,List<ContentValues>> pair = map.get(table);
+            if(pair == null) {
+                List<ContentValues> list = new ArrayList<>();
+                pair = new Pair<>(operation.getQueryParameters(), list);
+                map.put(table, pair);
             }
 
-            list.add(operation.getContentValues());
+            pair.second.add(operation.getContentValues());
         }
         return map;
     }
@@ -205,7 +212,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         if(contentValues == null) contentValues = new ContentValues();
 
         ArrayList<GenericContentProviderOperation> operations = GenericDaoHelper.getContentProviderOperationBatch(scheme, dbEntity, contentValues, insertParams, requestParameters);
-        dbHelper.applyBatch(operations);
+        bulkInsertGenericOperations(operations);
         dbHelper.notifyChange(scheme, keyValue);
 
         return SUCCESS;
@@ -219,7 +226,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         }
     }
 
-    public boolean delete(Class entityClass, @NotNull String[] keyValues) {
+    public boolean delete(Class entityClass, @NonNull String[] keyValues) {
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(entityClass);
         if (scheme.getKeyField() == null) {
             throw new IllegalArgumentException("You should mark some fields as key to use this method!");
@@ -320,7 +327,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return false;
     }
 
-    public int getCount(Class entityClass, @NotNull String where, String... args) {
+    public int getCount(Class entityClass, @NonNull String where, String... args) {
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(entityClass);
         Cursor cursor = dbHelper.query(scheme.getName(), new String[]{"count(*)"}, where, args, null, null, null);
 
@@ -395,6 +402,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         if(requestParameters == null) {
             requestParameters = new RequestParameters.Builder().build();
         }
+        TimeLogger.startLogging(dbHelper,TimeUnit.NANOSECONDS);
         Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(entityClass);
         ArrayList<DbEntity> objects = new ArrayList<>();
 
@@ -403,8 +411,6 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             QueryParameters.Builder queryParametersBuilder = new QueryParameters.Builder();
             queryParametersBuilder.addParameter(GenericDaoContentProvider.IS_MANY_TO_ONE_NESTED_AFFECTED, String.valueOf(requestParameters.isManyToOneGotWithParent()));
             Cursor cursor = dbHelper.query(scheme.getName(), null, where, args, groupBy, having, orderBy, limit, queryParametersBuilder.build());
-
-            long time = System.currentTimeMillis();
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
                     objects = new ArrayList<>();
@@ -415,12 +421,11 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
                 }
                 cursor.close();
             }
-            Log.i("test!","fromCursor = " + (System.currentTimeMillis() - time));
         }
 
         if (!RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
             for (DbEntity entity : objects) {
-                fillEntityWithNestedObjects(entity, requestParameters);
+                fillEntityWithNestedObjects(scheme, entity, requestParameters);
             }
         }
 
@@ -431,7 +436,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return getObjects(null, entityClass, where, args, groupBy, having, orderBy, limit);
     }
 
-    public <DbEntity> DbEntity getObjectById(@Nullable RequestParameters requestParameters, Class<DbEntity> entityClass, @NotNull String... keyValues) {
+    public <DbEntity> DbEntity getObjectById(@Nullable RequestParameters requestParameters, Class<DbEntity> entityClass, @NonNull String... keyValues) {
         if(requestParameters == null) {
             requestParameters = new RequestParameters.Builder().build();
         }
@@ -452,7 +457,7 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
             }
 
             if (entity != null && !RequestParameters.RequestMode.JUST_PARENT.equals(requestParameters.getRequestMode()) && scheme.hasNestedObjects()) {
-                fillEntityWithNestedObjects(entity, requestParameters);
+                fillEntityWithNestedObjects(scheme, entity, requestParameters);
             }
         }
 
@@ -460,18 +465,16 @@ public final class GenericDao<DbHelper extends GenericContentProvider> {
         return entity;
     }
 
-    public <DbEntity> DbEntity getObjectById(Class<DbEntity> entityClass, @NotNull String... keyValues) {
+    public <DbEntity> DbEntity getObjectById(Class<DbEntity> entityClass, @NonNull String... keyValues) {
         return getObjectById(null, entityClass, keyValues);
     }
 
 
-    public <DbEntity> void fillEntityWithNestedObjects(DbEntity entity, RequestParameters requestParameters) {
-        String keyValue = GenericDaoHelper.toKeyValue(entity);
+    public <DbEntity> void fillEntityWithNestedObjects(Scheme scheme, DbEntity entity, RequestParameters requestParameters) {
+        String keyValue = GenericDaoHelper.toKeyValue(scheme, entity);
         if (TextUtils.isEmpty(keyValue))
             return;
-
         Class objectClass = entity.getClass();
-        Scheme scheme = GenericDaoHelper.getSchemeInstanceOrThrow(objectClass);
 
         String columnName = GenericDaoHelper.getColumnNameFromTable(scheme.getName());
 

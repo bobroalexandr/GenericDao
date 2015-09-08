@@ -58,7 +58,6 @@ unMock {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:21.0.3'
     compile 'org.glassfish:javax.annotation:10.0-b28'
     compile project(':genericdao')
 

@@ -4,13 +4,21 @@ import android.content.ContentProvider;
 import android.content.Context;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Base64;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 public class UriHelper {
 
-    public static final String TABLE = "table";
 
     public static class Builder {
         private final Uri.Builder uriBuilder;
@@ -29,7 +37,7 @@ public class UriHelper {
         }
 
         public Builder addTable(String mainTable) {
-            uriBuilder.appendPath(TABLE).appendPath(mainTable);
+            uriBuilder.appendPath(GenericDaoContentProvider.TABLE).appendPath(mainTable);
             return this;
         }
 
@@ -62,6 +70,18 @@ public class UriHelper {
         return builder;
     }
 
+    public static Builder generateBuilder(Context context, List<QueryParameters> parameters) {
+        Builder builder = new Builder(context);
+        try {
+            builder.addQuery(GenericDaoContentProvider.PARAMS, GenericDaoHelper.fromQueryParametersListToBase64(parameters));
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return builder;
+    }
+
+
+
     private static void fillQueryFromMap(Builder builder, QueryParameters parameters) {
         if(parameters != null) {
             Map<String, String> parametersMap = parameters.getParameters();
@@ -78,7 +98,7 @@ public class UriHelper {
     public static String getTable(Uri uri) {
         List<String> pathSegments = uri.getPathSegments();
 
-        int tableIndex = pathSegments.indexOf(TABLE);
+        int tableIndex = pathSegments.indexOf(GenericDaoContentProvider.TABLE);
         if(tableIndex == -1 || pathSegments.size() < tableIndex + 2) {
             throw new Error("NO TABLE IN URI!");
         }

@@ -6,12 +6,15 @@ import android.content.ContentValues;
 import android.database.Cursor;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public interface GenericContentProvider {
 
     long insert(String table, String nullColumnHack, ContentValues values, QueryParameters parameters);
 
     int bulkInsert(String table, ContentValues[] values, QueryParameters parameters);
+
+    int bulkInsert(ContentValues[] values, List<QueryParameters> parameters);
 
     int update(String table, ContentValues values, String whereClause, String[] whereArgs, QueryParameters parameters);
 

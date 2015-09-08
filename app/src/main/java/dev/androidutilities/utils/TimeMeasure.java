@@ -1,6 +1,5 @@
 package dev.androidutilities.utils;
 
-import android.support.v4.util.TimeUtils;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -41,12 +40,7 @@ public class TimeMeasure {
 	public int getActionRes() {
 		return actionRes;
 	}
-	
-	public String getResult() {
-		StringBuilder stringBuilder = new StringBuilder();
-		TimeUtils.formatDuration(msec, stringBuilder);
-		return stringBuilder.toString();
-	}
+
 	
 	public long getNanoseconds() {
 		return nano;

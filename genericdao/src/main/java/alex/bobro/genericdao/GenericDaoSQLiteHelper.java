@@ -3,9 +3,9 @@ package alex.bobro.genericdao;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
 
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,7 +71,7 @@ public abstract class GenericDaoSQLiteHelper extends SQLiteOpenHelper {
     }
 
     @SuppressWarnings({"SynchronizationOnLocalVariableOrMethodParameter", "unchecked"})
-    protected static <T extends GenericDaoSQLiteHelper> T getInstance(@NotNull Class<T> clazz, @NotNull Context context, @NotNull String name) {
+    protected static <T extends GenericDaoSQLiteHelper> T getInstance(@NonNull Class<T> clazz, @NonNull Context context, @NonNull String name) {
         GenericDaoSQLiteHelper instanceLocal = SQLiteInterlockHelperSingleton.INSTANCE_MAP.get(clazz);
 
         if (isObsolete(instanceLocal, context, name)) {

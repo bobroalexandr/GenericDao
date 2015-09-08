@@ -3,11 +3,15 @@ package alex.bobro.genericdao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
+import android.util.Base64;
 
-import org.jetbrains.annotations.NotNull;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
@@ -16,18 +20,16 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import alex.bobro.genericdao.entities.Column;
 import alex.bobro.genericdao.entities.FieldType;
 import alex.bobro.genericdao.entities.RelationType;
 import alex.bobro.genericdao.util.CollectionUtils;
-import alex.bobro.genericdao.util.OutValue;
 import alex.bobro.genericdao.util.QueryBuilder;
 import alex.bobro.genericdao.util.Reflection;
-import alex.bobro.genericdao.util.TimeLogger;
 
 @SuppressWarnings({"unused"})
 public class GenericDaoHelper {
@@ -40,19 +42,19 @@ public class GenericDaoHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static Object getValueForField(@NotNull Scheme scheme, @NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field) {
+    public static Object getValueForField(@NonNull Scheme scheme, @NonNull Class genericDaoClass, @NonNull Object object, @NonNull Field field) {
         Reflection.Accessor fieldAccessor = scheme.getAccessorsMap().get(genericDaoClass).get(field.getName());
         return fieldAccessor.get(object);
     }
 
     @SuppressWarnings("unchecked")
-    public static void setValueForField(@NotNull Scheme scheme, @NotNull Class genericDaoClass, @NotNull Object object, @NotNull Field field, Object value) {
+    public static void setValueForField(@NonNull Scheme scheme, @NonNull Class genericDaoClass, @NonNull Object object, @NonNull Field field, Object value) {
         Reflection.Accessor fieldAccessor = scheme.getAccessorsMap().get(genericDaoClass).get(field.getName());
         fieldAccessor.set(object, value);
     }
 
 
-    private static String getGetterName(@NotNull Field field) {
+    private static String getGetterName(@NonNull Field field) {
         if (!field.getType().equals(boolean.class))
             return "get" + field.getName().substring(0, 1).toUpperCase() + field.getName().substring(1);
         else {
@@ -63,7 +65,7 @@ public class GenericDaoHelper {
         }
     }
 
-    private static String getSetterName(@NotNull Field field) {
+    private static String getSetterName(@NonNull Field field) {
         if (field.getType().equals(boolean.class) && field.getName().startsWith("is"))
             return field.getName().replace("is", "set");
         else
@@ -107,7 +109,7 @@ public class GenericDaoHelper {
         return builder.toString();
     }
 
-    public static String arrayToWhereString(@NotNull String... array) {
+    public static String arrayToWhereString(@NonNull String... array) {
         if (array.length == 0)
             return null;
 
@@ -121,7 +123,7 @@ public class GenericDaoHelper {
         return builder.toString();
     }
 
-    public static String arrayToInWhereString(@NotNull String... array) {
+    public static String arrayToInWhereString(@NonNull String... array) {
         if (array.length == 0)
             return null;
 
@@ -166,7 +168,7 @@ public class GenericDaoHelper {
 
 
     @SuppressWarnings("unchecked")
-    public static <DbEntity> void fillCvFromEntity(Scheme scheme, ContentValues contentValues, @NotNull DbEntity dbEntity, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters) {
+    public static <DbEntity> void fillCvFromEntity(Scheme scheme, ContentValues contentValues, @NonNull DbEntity dbEntity, ArrayList<GenericContentProviderOperation> operations, RequestParameters requestParameters, QueryParameters queryParameters) {
         if (requestParameters == null) {
             requestParameters = new RequestParameters.Builder().build();
         }
@@ -187,7 +189,7 @@ public class GenericDaoHelper {
                 continue;
 
             try {
-                operations.addAll(checkValueAndPutIntoCV(contentValues, column, scheme, dbEntity, requestParameters));
+                operations.addAll(checkValueAndPutIntoCV(contentValues, column, scheme, dbEntity, requestParameters, queryParameters));
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -210,15 +212,11 @@ public class GenericDaoHelper {
         if (TextUtils.isEmpty(className))
             return null;
 
-//        TimeLogger.logTime(GenericDaoHelper.class, "step 1");
         Reflection.Creator creator = scheme.getCreatorMap().get(className);
         Object object = creator.newInstanceFor();
         DbEntity entity = dbEntityClass.cast(object);
-//        TimeLogger.logTime(GenericDaoHelper.class, "step 2");
         if (entity != null)
             fillEntityWithValues(entity, creator.getConstructor().getDeclaringClass(), cursor, scheme, parentColumn);
-//        TimeLogger.logTime(GenericDaoHelper.class, "step 3");
-//        TimeLogger.stopLogging(GenericDaoHelper.class);
         return entity;
     }
 
@@ -243,48 +241,6 @@ public class GenericDaoHelper {
         }
     }
 
-
-//    private static <DbEntity> void fillEntityWithValues(DbEntity entity, Class<DbEntity> objectClass, Cursor cursor, Scheme scheme, OutValue<Integer> objectIndex) {
-//        List<String> columns = Arrays.asList(cursor.getColumnNames());
-//        int objectStartIndex = objectIndex.value;
-//        int objectFinishIndex = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-//        if (objectFinishIndex == -1)
-//            objectFinishIndex = columns.size();
-//
-//        objectIndex.value = objectFinishIndex;
-//
-//        for (int i = objectStartIndex + 1; i < objectFinishIndex; i++) {
-////            TimeLogger.startLogging(TimeLogger.class, TimeUnit.NANOSECONDS);
-//            if (i >= columns.size()) return;
-//            Column column = scheme.getAnnotatedFields().get(columns.get(i));
-//            if (column == null) continue;
-//            if (scheme.getAccessorsMap().get(objectClass).get(column.getConnectedField().getName()) == null) {
-//                continue;
-//            }
-//
-//            if (cursor.isNull(i)) {
-//                if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
-//                    Scheme manyToOneScheme = column.getScheme();
-//                    for (int k = 0; k < manyToOneScheme.getManyToOneFields().size() + 1; k++) {
-//                        objectIndex.value = indexOf(columns, objectIndex.value + 1, Scheme.COLUMN_OBJECT_CLASS_NAME);
-//                    }
-//                }
-//                continue;
-//            }
-//
-//            if (RelationType.ONE_TO_MANY.equals(column.getRelationType()) || RelationType.MANY_TO_MANY.equals(column.getRelationType()))
-//                continue;
-//
-////            TimeLogger.logTime(TimeLogger.class, "peref");
-//            Object valueForField = GenericDaoHelper.getValueForFieldFromCursor(column, cursor, RelationType.MANY_TO_ONE.equals(column.getRelationType()) ? objectIndex : new OutValue<>(i));
-////            TimeLogger.logTime(TimeLogger.class, "get");
-//            GenericDaoHelper.setValueForField(scheme, objectClass, entity, column.getConnectedField(), valueForField);
-////            TimeLogger.logTime(TimeLogger.class, "set");
-////            TimeLogger.stopLogging(TimeLogger.class);
-//        }
-//    }
-
-
     public static <T> int indexOf(List<T> list, int startIndex, Object object) {
         int s = list.size();
         if (object != null) {
@@ -304,7 +260,7 @@ public class GenericDaoHelper {
     }
 
     @SuppressWarnings({"all", "unchecked"})
-    private static ArrayList<GenericContentProviderOperation> checkValueAndPutIntoCV(@NotNull ContentValues cv, @NotNull Column column, @NotNull Scheme scheme, Object object, RequestParameters requestParameters) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
+    private static ArrayList<GenericContentProviderOperation> checkValueAndPutIntoCV(@NonNull ContentValues cv, @NonNull Column column, @NonNull Scheme scheme, Object object, RequestParameters requestParameters, QueryParameters queryParameters) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NoSuchFieldException {
         ArrayList<GenericContentProviderOperation> contentProviderOperationList = new ArrayList<>();
         if (object == null)
             return contentProviderOperationList;
@@ -370,7 +326,7 @@ public class GenericDaoHelper {
                 break;
 
             case OBJECT:
-                putObjectIntoCv(column, cv, fieldValue, requestParameters, field, name, contentProviderOperationList);
+                putObjectIntoCv(column, cv, fieldValue, requestParameters, field, name, contentProviderOperationList, queryParameters);
                 break;
         }
 
@@ -379,11 +335,11 @@ public class GenericDaoHelper {
 
     @SuppressWarnings("unchecked")
     private static void putObjectIntoCv(Column column, ContentValues cv, Object fieldValue, RequestParameters requestParameters, Field field, String name,
-                                        List<GenericContentProviderOperation> contentProviderOperationList) {
+                                        List<GenericContentProviderOperation> contentProviderOperationList, QueryParameters queryParameters) {
         if (RelationType.MANY_TO_ONE.equals(column.getRelationType())) {
             Scheme fieldScheme = column.getScheme();
             if (requestParameters.isManyToOneGotWithParent())
-                contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, null, requestParameters));
+                contentProviderOperationList.addAll(getContentProviderOperationBatch(fieldScheme, fieldValue, null, queryParameters, requestParameters));
             cv.put(column.getName(), GenericDaoHelper.toKeyValue(fieldScheme, fieldValue));
         } else if (fieldValue instanceof List) {
             ParameterizedType listType = (ParameterizedType) field.getGenericType();
@@ -488,7 +444,7 @@ public class GenericDaoHelper {
 
         if (!RequestParameters.RequestMode.JUST_NESTED.equals(requestParameters.getRequestMode())) {
             GenericContentProviderOperation.Builder builder = GenericContentProviderOperation.newInsert();
-            GenericDaoHelper.fillCvFromEntity(scheme, contentValues, dbEntity, contentProviderOperations, requestParameters);
+            GenericDaoHelper.fillCvFromEntity(scheme, contentValues, dbEntity, contentProviderOperations, requestParameters, insertParams);
             builder.withContentValues(contentValues)
                     .withQueryParameters(insertParams)
                     .withTable(scheme.getName());
@@ -669,8 +625,35 @@ public class GenericDaoHelper {
         return getColumnNameFrom(name, parentColumn == null ? scheme.getName() : parentColumn.getName(), separator);
     }
 
-    public static String getColumnNameFrom(String name, String tableName, String separator) {
-        return tableName + separator + name;
+
+    private static String getColumnNameFrom(String name, String tableName, String separator) {
+        return TextUtils.isEmpty(tableName) ? name : tableName + separator + name;
+    }
+
+    public static String fromQueryParametersListToBase64(List<QueryParameters> parameters) throws UnsupportedEncodingException {
+        JSONArray jsonArray = new JSONArray();
+        for (QueryParameters parameter : parameters) {
+            jsonArray.put(new JSONObject(parameter.getParameters()));
+        }
+        return new String(Base64.encode(jsonArray.toString().getBytes("utf-8"), 0), "utf-8");
+    }
+
+    public static List<QueryParameters> fromBase64tToQueryParametersList(String base64) throws UnsupportedEncodingException, JSONException {
+        String array = new String(Base64.decode(base64.getBytes("utf-8"),0),"utf-8");
+        List<QueryParameters> parameters = new ArrayList<>();
+        JSONArray jsonArray = new JSONArray(array);
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject object = jsonArray.getJSONObject(i);
+            Map<String, String> map = new HashMap<>();
+            Iterator<String> keysItr = object.keys();
+            while(keysItr.hasNext()) {
+                String key = keysItr.next();
+                String value = object.getString(key);
+                map.put(key, value);
+            }
+            parameters.add(new QueryParameters.Builder(map).build());
+        }
+        return parameters;
     }
 
 }

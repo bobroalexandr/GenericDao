@@ -9,19 +9,16 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
+import android.util.Base64;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.json.JSONException;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Objects;
-
-import alex.bobro.genericdao.util.OutValue;
-import alex.bobro.genericdao.util.Reflection;
+import java.util.List;
 
 /**
  * Created by alex on 24.11.14.
@@ -34,6 +31,11 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
     public static final String SHOULD_NOTIFY = "shouldNotify";
     public static final String IS_MANY_TO_ONE_NESTED_AFFECTED = "isManyToOneGotWithParent";
     public static final String ID = "id";
+    public static final String TABLE = "table";
+    public static final String START = "start";
+    public static final String END = "end";
+    public static final String PARAMS = "params";
+
 
     private UriMatcher uriMatcher;
     private String authority;
@@ -109,7 +111,7 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
         return resultUri;
     }
 
-    private boolean isExists(SQLiteDatabase sqLiteDatabase, @NotNull String table, @NotNull String fieldName, @NotNull String fieldValue) {
+    private boolean isExists(SQLiteDatabase sqLiteDatabase, @NonNull String table, @NonNull String fieldName, @NonNull String fieldValue) {
         Cursor cursor = sqLiteDatabase.query(table, null, GenericDaoHelper.arrayToWhereString(fieldName), new String[]{fieldValue}, null, null, null, null);
 
         boolean answer = false;
@@ -154,34 +156,47 @@ public abstract class GenericDaoContentProvider extends ContentProvider {
 
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
-        SQLiteDatabase db = getDbHelper().getWritableDatabase();
-        String table = UriHelper.getTable(uri);
-        Scheme scheme = Scheme.getSchemeInstance(table);
-        String keyField;
-        String conflictAlgorithm = uri.getQueryParameter(CONFLICT_ALGORITHM);
+        String params = uri.getQueryParameter(PARAMS);
+        List<QueryParameters> queryParametersList;
+        try {
+            queryParametersList = GenericDaoHelper.fromBase64tToQueryParametersList(params);
+        } catch (UnsupportedEncodingException e) {
+            return 0;
+        } catch (JSONException e) {
+            return 0;
+        }
 
+        SQLiteDatabase db = getDbHelper().getWritableDatabase();
         db.beginTransaction();
-        for (ContentValues value : values) {
-//            if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm) && isExists(db, table, keyField, keyValue = value.getAsString(keyField))) {
-//                db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
-//            } else {
-//                int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
-//                db.insertWithOnConflict(table, null, value, algorithm);
-//            }
-            if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm)) {
-                String keyValue = value.getAsString(keyField);
-                int updated = db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
-                if(updated == 0) {
-                    db.insertWithOnConflict(table, null, value, SQLiteDatabase.CONFLICT_NONE);
+
+        for (QueryParameters queryParameters : queryParametersList) {
+            String table = queryParameters.getParameter(TABLE);
+            Scheme scheme = Scheme.getSchemeInstance(table);
+            String keyField;
+            String conflictAlgorithm = queryParameters.getParameter(CONFLICT_ALGORITHM);
+            int start = Integer.valueOf(queryParameters.getParameter(START));
+            int end = Integer.valueOf(queryParameters.getParameter(END));
+
+            for (int i = start; i < end; i++) {
+                ContentValues value = values[i];
+                if (scheme != null && !TextUtils.isEmpty(keyField = scheme.getKeyField()) && TextUtils.isEmpty(conflictAlgorithm)) {
+                    String keyValue = value.getAsString(keyField);
+                    int updated = db.update(table, value, GenericDaoHelper.arrayToWhereString(keyField), new String[]{keyValue});
+                    if(updated == 0) {
+                        db.insertWithOnConflict(table, null, value, SQLiteDatabase.CONFLICT_NONE);
+                    }
+                } else {
+                    int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
+                    db.insertWithOnConflict(table, null, value, algorithm);
                 }
-            } else {
-                int algorithm = TextUtils.isEmpty(conflictAlgorithm) ? SQLiteDatabase.CONFLICT_NONE : Integer.parseInt(conflictAlgorithm);
-                db.insertWithOnConflict(table, null, value, algorithm);
             }
         }
+
         db.setTransactionSuccessful();
         db.endTransaction();
-        notifyUri(uri);
+        for (QueryParameters queryParameters : queryParametersList) {
+            notifyUri(new UriHelper.Builder(getContext()).addTable(queryParameters.getParameter(TABLE)).build());
+        }
         return values.length;
     }
 

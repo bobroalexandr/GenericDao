@@ -1,30 +1,18 @@
 package dev.androidutilities;
 
-import android.app.ActionBar;
-import android.content.ContentValues;
-import android.database.sqlite.SQLiteDatabase;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.PowerManager;
-import android.os.SystemClock;
-import android.support.v7.app.ActionBarActivity;
+import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.WindowManager;
-
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 
-import alex.bobro.genericdao.GenericContentProvider;
 import alex.bobro.genericdao.GenericDao;
-import alex.bobro.genericdao.GenericDaoContentProvider;
-import alex.bobro.genericdao.QueryParameters;
 import alex.bobro.genericdao.RequestParameters;
-import alex.bobro.genericdao.util.Reflection;
+import alex.bobro.genericdao.Scheme;
 import dev.androidutilities.model.TestChild1;
 import dev.androidutilities.model.TestChild2;
 import dev.androidutilities.model.TestEntity;
@@ -32,7 +20,7 @@ import dev.androidutilities.model.TestEntityNested;
 import dev.androidutilities.model.TestParent;
 
 
-public class MainActivity extends ActionBarActivity implements View.OnClickListener {
+public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +49,7 @@ public class MainActivity extends ActionBarActivity implements View.OnClickListe
         RequestParameters.Builder builder = new RequestParameters.Builder()
                 .withRequestMode(RequestParameters.RequestMode.JUST_PARENT);
         List<TestChild1> child1s = GenericDao.getInstance().getObjects(builder.build(), TestParent.class);
-        GenericDao.getInstance().fillEntityWithNestedObjects(child1s.get(0), builder.build());
+        GenericDao.getInstance().fillEntityWithNestedObjects(Scheme.getSchemeInstance(TestChild1.class),child1s.get(0), builder.build());
 
          Log.i("Test!", "test");
     }

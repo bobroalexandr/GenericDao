@@ -1,7 +1,8 @@
 package alex.bobro.genericdao.util;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -14,7 +15,7 @@ public abstract class Reflection {
 
 		private final Constructor<T> c;
 
-		private Creator(@NotNull Constructor<T> c) {
+		private Creator(@NonNull Constructor<T> c) {
 			if (!c.isAccessible()) {
 				c.setAccessible(true);
 			}
@@ -35,7 +36,7 @@ public abstract class Reflection {
 		}
 	}
 
-	public static <T> Creator<T> creator(@NotNull Class<T> clazz, Class<?>... args) {
+	public static <T> Creator<T> creator(@NonNull Class<T> clazz, Class<?>... args) {
 		try {
 			return new Creator<>(clazz.getDeclaredConstructor(args));
 		} catch (NoSuchMethodException e) {
@@ -47,7 +48,7 @@ public abstract class Reflection {
 	public static class Accessor<T> {
 		private final Field f;
 
-		private Accessor(@NotNull Field f) {
+		private Accessor(@NonNull Field f) {
 			if (!f.isAccessible()) {
 				f.setAccessible(true);
 			}
@@ -76,7 +77,7 @@ public abstract class Reflection {
 		}
 	}
 
-	public static <T> Accessor<T> accessor(boolean isCritical, @NotNull String fieldName, @NotNull Class<T> clazz, @Nullable Class<?> type) {
+	public static <T> Accessor<T> accessor(boolean isCritical, @NonNull String fieldName, @NonNull Class<T> clazz, @Nullable Class<?> type) {
 		if (type == null) {
 			type = Object.class;
 		}
@@ -109,7 +110,7 @@ public abstract class Reflection {
 
 		private final Method m;
 
-		private Invoker(@NotNull Method m) {
+		private Invoker(@NonNull Method m) {
 			if (!m.isAccessible()) {
 				m.setAccessible(true);
 			}
@@ -130,7 +131,7 @@ public abstract class Reflection {
 		}
 	}
 
-	public static <T> Invoker<T> invoker(boolean isCritical, @NotNull String methodName, @NotNull Class<T> clazz, Class<?>... args) {
+	public static <T> Invoker<T> invoker(boolean isCritical, @NonNull String methodName, @NonNull Class<T> clazz, Class<?>... args) {
 		try {
 			return new Invoker<>(clazz.getDeclaredMethod(methodName, args));
 		} catch (NoSuchMethodException e) {
@@ -142,7 +143,7 @@ public abstract class Reflection {
 		}
 	}
 
-	public static @Nullable Method getMethod(Class<?> clazz, String methodName) {
+	public static @Nullable	Method getMethod(Class<?> clazz, String methodName) {
 		try {
 			return clazz.getMethod(methodName);
 		} catch (NoSuchMethodException e) {

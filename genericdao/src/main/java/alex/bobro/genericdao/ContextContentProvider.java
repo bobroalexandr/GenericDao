@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.os.RemoteException;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by alex on 12/16/14.
@@ -33,6 +34,12 @@ public class ContextContentProvider extends AbstractGenericContentProvider {
     @Override
     public int bulkInsert(String table, ContentValues[] values, QueryParameters parameters) {
         UriHelper.Builder builder = UriHelper.generateBuilder(getContext(), table, parameters);
+        return context.getContentResolver().bulkInsert(builder.build(), values);
+    }
+
+    @Override
+    public int bulkInsert(ContentValues[] values, List<QueryParameters> parameters) {
+        UriHelper.Builder builder = UriHelper.generateBuilder(getContext(), parameters);
         return context.getContentResolver().bulkInsert(builder.build(), values);
     }
 

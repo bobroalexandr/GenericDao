@@ -16,11 +16,23 @@ public class QueryParameters {
         return parameters;
     }
 
+    public void addParameter(String key, String value) {
+        parameters.put(key, value);
+    }
+
+    public String getParameter(String key) {
+        return parameters.get(key);
+    }
+
     public static class Builder {
         private Map<String, String> parameters;
 
         public Builder() {
             parameters = new HashMap<>();
+        }
+
+        public Builder(Map<String, String> parameters) {
+            this.parameters = new HashMap<>(parameters);
         }
 
         public QueryParameters build() {

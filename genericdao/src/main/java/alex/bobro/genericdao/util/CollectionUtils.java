@@ -1,7 +1,7 @@
 package alex.bobro.genericdao.util;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -10,7 +10,7 @@ import java.util.List;
 
 public abstract class CollectionUtils {
 
-	public static <T> int findItemIndex(@NotNull List<T> items, T newItem, @NotNull Comparator<T> comparator) {
+	public static <T> int findItemIndex(@NonNull List<T> items, T newItem, @NonNull Comparator<T> comparator) {
 		final int currentSize = items.size();
 
 		int lo = 0, hi = currentSize - 1;
@@ -28,14 +28,14 @@ public abstract class CollectionUtils {
 		return lo;
 	}
 
-	public static <T> boolean insertItem(@NotNull List<T> items, T newItem, @NotNull Comparator<T> comparator) {
+	public static <T> boolean insertItem(@NonNull List<T> items, T newItem, @NonNull Comparator<T> comparator) {
 		final int currentSize = items.size();
 
 		items.add(findItemIndex(items, newItem, comparator), newItem);
 		return items.size() > currentSize;
 	}
 
-	public static <T> boolean insertItems(@NotNull List<T> items, @Nullable Collection<T> newItems, @NotNull Comparator<T> comparator) {
+	public static <T> boolean insertItems(@NonNull List<T> items, @Nullable Collection<T> newItems, @NonNull Comparator<T> comparator) {
 		if (newItems == null || newItems.isEmpty())
 			return false;
 
@@ -53,7 +53,7 @@ public abstract class CollectionUtils {
 		public boolean select(T item);
 	}
 
-	public static <T> boolean contains(Collection<T> collection, @NotNull Selection<T> where) {
+	public static <T> boolean contains(Collection<T> collection, @NonNull Selection<T> where) {
 		for (T item : collection) {
 			if (where.select(item)) {
 				return true;
@@ -62,7 +62,7 @@ public abstract class CollectionUtils {
 		return false;
 	}
 
-	public static <T> int eraseAll(Collection<T> collection, @NotNull Selection<T> where) {
+	public static <T> int eraseAll(Collection<T> collection, @NonNull Selection<T> where) {
 		int countErased = 0;
 		for (Iterator<T> collectionIt = collection.iterator(); collectionIt.hasNext();) {
 			T item = collectionIt.next();
@@ -75,7 +75,7 @@ public abstract class CollectionUtils {
 		return countErased;
 	}
 
-    public static <T> boolean contains(@NotNull List<T> items, T item, @NotNull Comparator<T> comparator) {
+    public static <T> boolean contains(@NonNull List<T> items, T item, @NonNull Comparator<T> comparator) {
         for (T i : items) {
             if(comparator.compare(i, item) == 0) {
                 return true;

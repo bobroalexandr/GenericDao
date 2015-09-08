@@ -1,7 +1,8 @@
 package alex.bobro.genericdao.util;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import java.lang.reflect.Modifier;
 
@@ -9,7 +10,7 @@ public class SingletonHelper<T> {
 
 	private final Reflection.Creator<T> creator;
 
-	public SingletonHelper(@NotNull Class<T> clazz, Class<?>... args) {
+	public SingletonHelper(@NonNull Class<T> clazz, Class<?>... args) {
 		creator = Reflection.creator(clazz, args);
 
 		if (Modifier.isPublic(creator.getConstructor().getModifiers()))
@@ -20,7 +21,7 @@ public class SingletonHelper<T> {
 	private volatile T instance;
 
 
-	private T writeInstance(@NotNull String error, @Nullable T newInstance) {
+	private T writeInstance(@NonNull String error, @Nullable T newInstance) {
 		T instanceLocal = instance;
 
 //		if (instanceLocal != null && newInstance != null) {
